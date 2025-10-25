@@ -1,0 +1,25 @@
+model Subscription {
+    id              String           @id @default(auto()) @map("_id") @db.ObjectId
+    title           String
+    price           Float
+    stripePriceId   String?
+    stripeProductId String?
+    duration        SubscriptionType
+    feature         String[]
+
+    isActive Boolean @default(true)
+    adminId  String  @db.ObjectId
+    admin    Admin   @relation(fields: [adminId], references: [id])
+
+    payment Payment[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@map("subscription")
+}
+
+enum SubscriptionType {
+    MONTHLY
+    YEARLY
+}

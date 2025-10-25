@@ -1,0 +1,45 @@
+model User {
+  id       String       @id @default(auto()) @map("_id") @db.ObjectId
+  email    String       @unique
+  password String
+  role     UserRoleEnum
+
+  status UserStatus @default(ACTIVE)
+
+  otp             String?
+  otpExpiry       DateTime?
+  fcmToken        String?
+  isEmailVerified Boolean   @default(false)
+  isDeleted       Boolean   @default(false)
+
+  stripeCustomerId String?
+
+  // receiver Notification[] @relation("Receiver")
+  // sender   Notification[] @relation("Sender")
+
+  //relation by email
+  admin   Admin?
+  founder Founder?
+  seeder  Seeder?
+
+  // roomSender   Room[] @relation("RoomSender")
+  // roomReceiver Room[] @relation("RoomReceiver")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  // sentChats     Chat[]   @relation("ChatSender")
+  // receivedChats Chat[]   @relation("ChatReceiver")
+
+  @@map("users")
+}
+
+enum UserRoleEnum {
+  ADMIN
+  SEEDER
+  FOUNDER
+}
+
+enum UserStatus {
+  ACTIVE
+  RESTRICTED
+}

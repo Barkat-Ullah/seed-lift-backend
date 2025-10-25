@@ -1,0 +1,27 @@
+model Challenge {
+    id          String          @id @default(auto()) @map("_id") @db.ObjectId
+    title       String
+    description String
+    category    String
+    attachment  String
+    tags        String[]
+    seedPoints  Int
+    deadline    DateTime
+    status      ChallengeStatus @default(PENDING)
+    isActive    Boolean         @default(true)
+
+    founderId String @db.ObjectId
+    seederId  String @db.ObjectId
+
+    seeder    Seeder   @relation(fields: [seederId], references: [id])
+    founder   Founder  @relation(fields: [founderId], references: [id])
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@map("challenge")
+}
+
+enum ChallengeStatus {
+    PENDING
+    FINISHED
+}
