@@ -1,11 +1,20 @@
 model Seeder {
-    id          String   @id @default(auto()) @map("_id") @db.ObjectId
+    id          String    @id @default(auto()) @map("_id") @db.ObjectId
     fullName    String
     description String?
-    email       String   @unique
+    email       String    @unique
     profile     String?
     phoneNumber String?
     skill       String[]
+    isVerified  Boolean   @default(false)
+    level       LevelEnum @default(Normal)
+
+    // stripeCustomerId  String?
+    // subscriptionStart DateTime?
+    // subscriptionEnd   DateTime?
+
+    // subscriptionId String?       @db.ObjectId
+    // subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
 
     user User @relation(fields: [email], references: [email])
 
@@ -16,8 +25,8 @@ model Seeder {
     @@map("seeder")
 }
 
-enum OrgTypeEnum {
-    Startup
-    Established
-    NGO
+enum LevelEnum {
+    Hard
+    Intermediate
+    Normal
 }

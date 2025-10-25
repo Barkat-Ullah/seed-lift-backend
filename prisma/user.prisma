@@ -22,13 +22,13 @@ model User {
   founder Founder?
   seeder  Seeder?
 
-  // roomSender   Room[] @relation("RoomSender")
-  // roomReceiver Room[] @relation("RoomReceiver")
+  roomSender   Room[] @relation("RoomSender")
+  roomReceiver Room[] @relation("RoomReceiver")
 
+  sentChats     Chat[]   @relation("ChatSender")
+  receivedChats Chat[]   @relation("ChatReceiver")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  // sentChats     Chat[]   @relation("ChatSender")
-  // receivedChats Chat[]   @relation("ChatReceiver")
 
   @@map("users")
 }
