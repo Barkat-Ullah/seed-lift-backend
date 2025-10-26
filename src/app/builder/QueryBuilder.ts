@@ -1,7 +1,6 @@
-// Query Builder in Prisma
-
 import httpStatus from 'http-status';
 import AppError from '../errors/AppError';
+import { UserRoleEnum } from '@prisma/client';
 
 type ExtractSelect<T> = T extends { findMany(args: { select: infer S }): any }
   ? S
@@ -77,7 +76,35 @@ class QueryBuilder<
     };
 
     for (const [key, value] of Object.entries(queryObj)) {
-      setNestedObject(formattedFilters, key, value);
+      let processedValue = value;
+      if (key === 'role' && typeof value === 'string') {
+        const roleStr = value as string;
+        const roleParts = roleStr.split(',').map(r => r.trim());
+        if (roleParts.length === 1) {
+          try {
+            processedValue = UserRoleEnum[roleStr as keyof typeof UserRoleEnum];
+          } catch {
+            throw new AppError(
+              httpStatus.BAD_REQUEST,
+              `Invalid role: ${roleStr}`,
+            );
+          }
+        } else {
+          // For multiple roles, like role=SEEDER,FOUNDER -> { in: [enum1, enum2] }
+          const enumRoles = roleParts.map(role => {
+            try {
+              return UserRoleEnum[role as keyof typeof UserRoleEnum];
+            } catch {
+              throw new AppError(
+                httpStatus.BAD_REQUEST,
+                `Invalid role: ${role}`,
+              );
+            }
+          });
+          processedValue = { in: enumRoles };
+        }
+      }
+      setNestedObject(formattedFilters, key, processedValue);
     }
 
     this.prismaQuery.where = {
@@ -87,7 +114,6 @@ class QueryBuilder<
 
     return this;
   }
-
 
   where(conditions: Record<string, unknown>) {
     this.prismaQuery.where = {
@@ -198,10 +224,16 @@ class QueryBuilder<
       }
     }
 
+    // For count, ensure where is properly set and remove skip/take
+    const countQuery = { where: this.prismaQuery.where };
+    if (!countQuery.where) {
+      delete countQuery.where;
+    }
+
     // Run findMany and count in parallel
     const [results, total] = await Promise.all([
       this.model.findMany(this.prismaQuery),
-      this.model.count({ where: this.prismaQuery.where }),
+      this.model.count(countQuery),
     ]);
 
     // Handle removing primary key from results if requested

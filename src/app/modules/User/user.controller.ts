@@ -2,7 +2,7 @@ import httpStatus from 'http-status';
 import catchAsync from '../../utils/catchAsync';
 import sendResponse from '../../utils/sendResponse';
 import { UserServices } from './user.service';
-import { Request } from 'express';
+
 
 const getAllUsers = catchAsync(async (req, res) => {
   const result = await UserServices.getAllUsersFromDB(req.query);
@@ -37,23 +37,10 @@ const getUserDetails = catchAsync(async (req, res) => {
 });
 
 
-
-const updateUserRoleStatus = catchAsync(async (req, res) => {
-  const { id } = req.params;
-  const role = req.body.role;
-  const result = await UserServices.updateUserRoleStatusIntoDB(id, role);
-
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    message: 'User role updated successfully',
-    data: result,
-  });
-});
-
 const updateUserStatus = catchAsync(async (req, res) => {
+  const userId = req.user.id;
   const { id } = req.params;
-  const status = req.body.status;
-  const result = await UserServices.updateUserStatus(id, status);
+  const result = await UserServices.updateUserStatus(id, userId);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -61,16 +48,7 @@ const updateUserStatus = catchAsync(async (req, res) => {
     data: result,
   });
 });
-const updateUserApproval = catchAsync(async (req, res) => {
-  const { userId } = req.body;
-  const result = await UserServices.updateUserApproval(userId);
 
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    message: 'User approved successfully',
-    data: result,
-  });
-});
 
 const softDeleteUser = catchAsync(async (req, res) => {
   const id = req.user.id;
@@ -89,27 +67,29 @@ const hardDeleteUser = catchAsync(async (req, res) => {
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
-    message: 'User soft deleted successfully',
-    data: result,
-  });
-});
-
-const updateUser = catchAsync(async (req, res) => {
-  const id = req.params.id;
-  const result = await UserServices.updateUserIntoDb(req, id);
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: 'User updated successfully!',
+    message: 'User hard deleted successfully',
     data: result,
   });
 });
 
 const updateMyProfile = catchAsync(async (req, res) => {
-  const id = req.user.id;
-  const file = req.file;
-  const payload = JSON.parse(req.body.data);
-  const result = await UserServices.updateMyProfileIntoDB(id, file, payload);
+  const userId = req.user.id;
+  const role = req.user.role;
+
+  // Multer files
+  const profileFile =
+    req.files && (req.files as any).profile
+      ? (req.files as any).profile[0]
+      : undefined;
+
+  const payload = JSON.parse(req.body.data || '{}');
+
+  const result = await UserServices.updateMyProfile(
+    userId,
+    role,
+    profileFile,
+    payload,
+  );
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -119,16 +99,12 @@ const updateMyProfile = catchAsync(async (req, res) => {
   });
 });
 
-
 export const UserControllers = {
   getAllUsers,
   getMyProfile,
   getUserDetails,
-  updateUserRoleStatus,
   updateUserStatus,
-  updateUserApproval,
   softDeleteUser,
   hardDeleteUser,
-  updateUser,
   updateMyProfile,
 };

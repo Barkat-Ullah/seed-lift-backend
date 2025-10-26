@@ -8,12 +8,12 @@ model Subscription {
     feature         String[]
 
     isActive Boolean @default(true)
-    
+
     adminId  String  @db.ObjectId
     admin    Admin   @relation(fields: [adminId], references: [id])
 
-    // seeder Seeder[]
-    // founder Founder[]
+    seeder Seeder[]
+    founder Founder[]
     payment Payment[]
 
     createdAt DateTime @default(now())

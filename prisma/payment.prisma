@@ -2,6 +2,8 @@ model Payment {
     id String @id @default(auto()) @map("_id") @db.ObjectId
 
     subscriptionId String @db.ObjectId
+    founderId      String? @db.ObjectId
+    seederId       String? @db.ObjectId
 
     amount   Float
     currency Currency      @default(usd)
@@ -18,11 +20,12 @@ model Payment {
     stripeSubscriptionId String? @unique
     stripeCustomerId     String?
 
+    founder      Founder ?     @relation(fields: [founderId], references: [id])
+    seeder       Seeder ?      @relation(fields: [seederId], references: [id])
     subscription Subscription @relation(fields: [subscriptionId], references: [id])
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
-
 
     @@map("payments")
 }

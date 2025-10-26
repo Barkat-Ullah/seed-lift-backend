@@ -7,18 +7,20 @@ model Founder {
     phoneNumber  String?      @unique
     businessName String?
     orgType      OrgTypeEnum?
+    // isVerified  Boolean   @default(false)
 
-    // stripeCustomerId  String?
-    // subscriptionStart DateTime?
-    // subscriptionEnd   DateTime?
+    stripeCustomerId  String?
+    subscriptionStart DateTime?
+    subscriptionEnd   DateTime?
 
-    // subscriptionId String?       @db.ObjectId
-    // subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
+    subscriptionId String?       @db.ObjectId
+    subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
 
     user User @relation(fields: [email], references: [email])
 
     challenge Challenge[]
-    
+    payment Payment[]
+
     createdAt DateTime    @default(now())
     updatedAt DateTime    @updatedAt
 

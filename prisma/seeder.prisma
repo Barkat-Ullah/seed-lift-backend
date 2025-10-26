@@ -7,16 +7,19 @@ model Seeder {
     phoneNumber String?
     skill       String[]
     isVerified  Boolean   @default(false)
-    level       LevelEnum @default(Normal)
+    level       LevelEnum @default(Starter)
+    coin        Int?      @default(0)
 
-    // stripeCustomerId  String?
-    // subscriptionStart DateTime?
-    // subscriptionEnd   DateTime?
+    stripeCustomerId  String?
+    subscriptionStart DateTime?
+    subscriptionEnd   DateTime?
 
-    // subscriptionId String?       @db.ObjectId
-    // subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
+    subscriptionId String?       @db.ObjectId
+    subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
 
-    user User @relation(fields: [email], references: [email])
+    user    User      @relation(fields: [email], references: [email])
+    payment Payment[]
+    comment Comment[]
 
     challenge Challenge[]
     createdAt DateTime    @default(now())
@@ -26,7 +29,8 @@ model Seeder {
 }
 
 enum LevelEnum {
-    Hard
+    Pro
+    Gold
     Intermediate
-    Normal
+    Starter
 }

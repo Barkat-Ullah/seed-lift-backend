@@ -2,49 +2,128 @@ import httpStatus from 'http-status';
 import { User, UserRoleEnum, UserStatus } from '@prisma/client';
 import QueryBuilder from '../../builder/QueryBuilder';
 import { prisma } from '../../utils/prisma';
-
-import { Request } from 'express';
 import AppError from '../../errors/AppError';
 import { uploadToDigitalOceanAWS } from '../../utils/uploadToDigitalOceanAWS';
 
 interface UserWithOptionalPassword extends Omit<User, 'password'> {
   password?: string;
 }
+
 const getAllUsersFromDB = async (query: any) => {
   const usersQuery = new QueryBuilder<typeof prisma.user>(prisma.user, query);
-  usersQuery.where({ role: 'USER' });
+  usersQuery.where({
+    role: {
+      in: [UserRoleEnum.SEEDER, UserRoleEnum.FOUNDER],
+    },
+  });
   const result = await usersQuery
-    .search(['fullName', 'email', 'address', 'city'])
+    .search([
+      'seeder.fullName',
+      'founder.fullName',
+      'email',
+      'seeder.description',
+      'founder.description',
+    ])
     .filter()
     .sort()
     .fields()
     .exclude()
     .paginate()
+    .customFields({
+      id: true,
+      email: true,
+      role: true,
+      status: true,
+      seeder: {
+        select: {
+          id: true,
+          fullName: true,
+          phoneNumber: true,
+        },
+      },
+      founder: {
+        select: {
+          id: true,
+          fullName: true,
+          phoneNumber: true,
+        },
+      },
+    })
     .execute();
-  return result;
+
+  return {
+    ...result,
+    data: result.data,
+  };
 };
 
 const getMyProfileFromDB = async (id: string) => {
-  const Profile = await prisma.user.findUniqueOrThrow({
+  const user = await prisma.user.findUniqueOrThrow({
     where: {
-      id: id,
+      id,
+      status: UserStatus.ACTIVE,
     },
     select: {
       id: true,
-      fullName: true,
       email: true,
-      phoneNumber: true,
       role: true,
       status: true,
-      describe: true,
-      city: true,
-      address: true,
-      profile: true,
-      
     },
   });
 
-  return Profile;
+  let profileInfo = null;
+
+  if (user.role === UserRoleEnum.ADMIN) {
+    profileInfo = await prisma.admin.findUnique({
+      where: { email: user.email },
+      select: {
+        id: true,
+        fullName: true,
+        profile: true,
+        phoneNumber: true,
+        address: true,
+      },
+    });
+  } else if (user.role === UserRoleEnum.SEEDER) {
+    profileInfo = await prisma.seeder.findUnique({
+      where: { email: user.email },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        profile: true,
+        phoneNumber: true,
+        description: true,
+        skill: true,
+        isVerified: true,
+        level: true,
+        coin: true,
+      },
+    });
+  } else if (user.role === UserRoleEnum.FOUNDER) {
+    profileInfo = await prisma.founder.findUnique({
+      where: { email: user.email },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        profile: true,
+        phoneNumber: true,
+        description: true,
+        businessName: true,
+        orgType: true,
+      },
+    });
+  }
+
+  if (!profileInfo) {
+    throw new AppError(httpStatus.NOT_FOUND, 'Profile not found!');
+  }
+
+  return {
+    ...user,
+    profile: profileInfo,
+  };
 };
 
 const getUserDetailsFromDB = async (id: string) => {
@@ -52,70 +131,112 @@ const getUserDetailsFromDB = async (id: string) => {
     where: { id },
     select: {
       id: true,
-      fullName: true,
       email: true,
-      phoneNumber: true,
       role: true,
       status: true,
-      describe: true,
-      city: true,
-      address: true,
-      profile: true,
-      clientInfo: true,
+      isDeleted: true,
+      isEmailVerified: true,
     },
   });
-  return user;
+
+  if (!user) {
+    throw new AppError(httpStatus.NOT_FOUND, 'User not found');
+  }
+
+  let profileInfo = null;
+  if (user.role === UserRoleEnum.ADMIN) {
+    profileInfo = await prisma.admin.findUnique({
+      where: { email: user.email },
+      select: {
+        id: true,
+        fullName: true,
+        profile: true,
+        phoneNumber: true,
+        address: true,
+      },
+    });
+  } else if (user.role === UserRoleEnum.SEEDER) {
+    profileInfo = await prisma.seeder.findUnique({
+      where: { email: user.email },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        profile: true,
+        phoneNumber: true,
+        description: true,
+        skill: true,
+        isVerified: true,
+        level: true,
+        coin: true,
+        subscription: {
+          select: {
+            id: true,
+          },
+        },
+      },
+    });
+  } else if (user.role === UserRoleEnum.FOUNDER) {
+    profileInfo = await prisma.founder.findUnique({
+      where: { email: user.email },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        profile: true,
+        phoneNumber: true,
+        description: true,
+        businessName: true,
+        orgType: true,
+        subscription: {
+          select: {
+            id: true,
+          },
+        },
+      },
+    });
+  }
+
+  if (!profileInfo) {
+    throw new AppError(httpStatus.NOT_FOUND, 'Profile details not found!');
+  }
+
+  return {
+    ...user,
+    profile: profileInfo,
+  };
 };
 
-const updateUserRoleStatusIntoDB = async (id: string, role: UserRoleEnum) => {
-  const result = await prisma.user.update({
-    where: {
-      id: id,
-    },
-    data: {
-      role: role,
-    },
+const updateUserStatus = async (userId: string, adminId: string) => {
+  const admin = await prisma.user.findUnique({ where: { id: adminId } });
+  if (!admin || admin.role !== UserRoleEnum.ADMIN) {
+    throw new AppError(httpStatus.FORBIDDEN, 'Only admin can approve');
+  }
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
   });
-  return result;
-};
-const updateUserStatus = async (id: string, status: UserStatus) => {
+
+  if (!user) throw new AppError(httpStatus.NOT_FOUND, 'User not found');
+
+  const newStatus =
+    user.status === UserStatus.ACTIVE
+      ? UserStatus.RESTRICTED
+      : UserStatus.ACTIVE;
+
   const result = await prisma.user.update({
-    where: {
-      id,
-    },
-    data: {
-      status,
-    },
+    where: { id: userId },
+    data: { status: newStatus },
     select: {
       id: true,
-      status: true,
+      email: true,
       role: true,
+      status: true,
+      founder: { select: { fullName: true } },
+      seeder: { select: { fullName: true } },
     },
   });
-  return result;
-};
-const updateUserApproval = async (userId: string) => {
-  console.log(userId);
-  // const user = await prisma.user.findUnique({
-  //   where: { id: userId },
-  //   select: {
-  //     id: true,
-  //     fullName: true,
-  //     email: true,
-  //     isApproved: true,
-  //   },
-  // });
 
-  // if (!user) {
-  //   throw new AppError(httpStatus.NOT_FOUND, 'User not found');
-  // }
-  // const result = await prisma.user.update({
-  //   where: { id: userId },
-  //   data: {
-  //     isApproved: true,
-  //   },
-  // });
-  // return result;
+  return result;
 };
 
 const softDeleteUserIntoDB = async (id: string) => {
@@ -129,151 +250,98 @@ const softDeleteUserIntoDB = async (id: string) => {
   });
   return result;
 };
+
 const hardDeleteUserIntoDB = async (id: string, adminId: string) => {
-  // const adminUser = await prisma.user.findUnique({
-  //   where: {
-  //     id: adminId,
-  //     role: UserRoleEnum.ADMIN,
-  //   },
-  // });
-  // if (!adminUser) {
-  //   throw new AppError(httpStatus.UNAUTHORIZED, 'You are not a admin');
-  // }
-  // return await prisma.$transaction(
-  //   async tx => {
-  //     // related tables delete
-  //     await tx.goal.deleteMany({ where: { userId: id } });
-  //     await tx.message.deleteMany({ where: { senderId: id } });
-  //     await tx.message.deleteMany({ where: { receiverId: id } });
-  //     await tx.payment.deleteMany({ where: { userId: id } });
-  //     await tx.motivation.deleteMany({ where: { userId: id } });
-  //     await tx.notificationUser.deleteMany({ where: { userId: id } });
-  //     await tx.vision.deleteMany({ where: { userId: id } });
-  //     await tx.community.deleteMany({ where: { userId: id } });
-  //     await tx.communityMembers.deleteMany({ where: { userId: id } });
-  //     await tx.follow.deleteMany({
-  //       where: {
-  //         OR: [{ followerId: id }, { followingId: id }],
-  //       },
-  //     });
-  //     const deletedUser = await tx.user.delete({
-  //       where: { id },
-  //       select: { id: true, email: true },
-  //     });
-  //     return deletedUser;
-  //   },
-  //   {
-  //     timeout: 20000,
-  //     maxWait: 5000,
-  //   },
-  // );
+  // TODO: Implement transaction for deleting related records (e.g., challenges, rooms, chats) based on your models
+  // For now, just delete the user
+  const deletedUser = await prisma.user.delete({
+    where: { id },
+    select: { id: true, email: true },
+  });
+  return deletedUser;
 };
 
-const updateUserIntoDb = async (req: Request, id: string) => {
-  // Step 1️⃣: Check if user exists
-  const userInfo = await prisma.user.findUnique({
-    where: { id },
-  });
-
-  if (!userInfo) {
-    throw new AppError(httpStatus.NOT_FOUND, 'User not found with id: ' + id);
-  }
-
-  // Step 2️⃣: Parse incoming data
-  const { fullName,  describe, city, address, phoneNumber } =
-    JSON.parse(req.body.data);
-
-  // Step 3️⃣: Handle file upload (optional)
-  const file = req.file as Express.Multer.File | undefined;
-  
-  let profileUrl: string | null = userInfo.profile;
-
-  if (file) {
-    const location = await uploadToDigitalOceanAWS(file);
-    profileUrl = location.Location;
-  }
-
-  // Step 4️⃣: Update user in DB
-  const result = await prisma.user.update({
-    where: { id },
-    data: {
-      fullName,
-      // businessType,
-      describe,
-      city,
-      address,
-      phoneNumber,
-      profile: profileUrl,
-    },
-    select: {
-      id: true,
-      fullName: true,
-      email: true,
-      profile: true,
-      role: true,
-      // businessType: true,
-      describe: true,
-      city: true,
-      address: true,
-      status: true,
-    },
-  });
-
-  if (!result) {
-    throw new AppError(
-      httpStatus.INTERNAL_SERVER_ERROR,
-      'Failed to update user profile',
-    );
-  }
-
-  return result;
-};
-
-const updateMyProfileIntoDB = async (
-  id: string,
-  file: Express.Multer.File | undefined,
-  payload: Partial<User>,
+const updateMyProfile = async (
+  userId: string,
+  role: UserRoleEnum,
+  profileFile?: Express.Multer.File,
+  payload?: any,
 ) => {
-  // Prevent updating sensitive fields
-  const { email, role, ...updateData } = payload;
+  // 1️⃣ Get user to fetch email
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true },
+  });
+  if (!user) throw new Error('User not found');
 
   let profileUrl: string | null = null;
-  if (file) {
-    const location = await uploadToDigitalOceanAWS(file);
-    profileUrl = location.Location;
-    updateData.profile = profileUrl;
+
+  if (profileFile) {
+    const uploaded = await uploadToDigitalOceanAWS(profileFile);
+    profileUrl = uploaded.Location;
   }
 
-  // Always update (with or without file)
-  const result = await prisma.user.update({
-    where: { id },
-    data: updateData,
-    select: {
-      id: true,
-      fullName: true,
-      email: true,
-      phoneNumber: true,
-      profile: true,
-      role: true,
-      status: true,
-      describe: true,
-      city: true,
-      address: true,
-    },
-  });
+  const updateData: any = { ...payload };
+  if (profileUrl) updateData.profile = profileUrl;
 
-  return result;
+  if (role === UserRoleEnum.ADMIN) {
+    return await prisma.admin.update({
+      where: { email: user.email },
+      data: updateData,
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        profile: true,
+        phoneNumber: true,
+        address: true,
+      },
+    });
+  }
+
+  if (role === UserRoleEnum.FOUNDER) {
+    return await prisma.founder.update({
+      where: { email: user.email },
+      data: updateData,
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        profile: true,
+        phoneNumber: true,
+        description: true,
+        businessName: true,
+        orgType: true,
+      },
+    });
+  }
+
+  if (role === UserRoleEnum.SEEDER) {
+    return await prisma.seeder.update({
+      where: { email: user.email },
+      data: updateData,
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        profile: true,
+        phoneNumber: true,
+        description: true,
+        skill: true,
+        isVerified: true,
+        level: true,
+        coin: true,
+      },
+    });
+  }
 };
 
 export const UserServices = {
   getAllUsersFromDB,
   getMyProfileFromDB,
   getUserDetailsFromDB,
-  updateUserRoleStatusIntoDB,
   updateUserStatus,
-  updateUserApproval,
   softDeleteUserIntoDB,
   hardDeleteUserIntoDB,
-  updateUserIntoDb,
-  updateMyProfileIntoDB,
+  updateMyProfile,
 };

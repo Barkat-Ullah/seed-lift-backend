@@ -7,6 +7,7 @@ type TMeta = {
   totalPage?: number;
 };
 
+
 type TResponse<T> = {
   statusCode: number;
   success?: boolean;
