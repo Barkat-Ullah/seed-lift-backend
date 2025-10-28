@@ -22,8 +22,8 @@ const getAllSeeder = async (query: Record<string, any>, userMail: string) => {
       profile: true,
       level: true,
       coin: true,
-      subscriptionStart: true,
-      subscriptionEnd: true,
+      // subscriptionStart: true,
+      // subscriptionEnd: true,
     },
   });
 
@@ -56,32 +56,32 @@ const getAllSeeder = async (query: Record<string, any>, userMail: string) => {
       coin: true,
       email: true,
       skill: true,
-      subscriptionStart: true,
-      subscriptionEnd: true,
+      // subscriptionStart: true,
+      // subscriptionEnd: true,
       createdAt: true,
     },
+    take: 15,
   });
 
-  // add Ranking metadata 
+  // add Ranking metadata
   const seedersWithRanking = seeders.map(seeder => {
-    const hasSubscription = hasActiveSubscription(seeder);
+    // const hasSubscription = hasActiveSubscription(seeder);
     const levelPriority =
       LEVEL_CONFIG[seeder.level as keyof typeof LEVEL_CONFIG]?.priority || 5;
 
     return {
       ...seeder,
-      hasActiveSubscription: hasSubscription,
+      // hasActiveSubscription: hasSubscription,
       levelPriority,
-      sortKey: hasSubscription ? 0 : 1,
+      // sortKey: hasSubscription ? 0 : 1,
     };
   });
 
-  // Ranking sort 
+  // Ranking sort
   seedersWithRanking.sort((a, b) => {
-
-    if (a.sortKey !== b.sortKey) {
-      return a.sortKey - b.sortKey;
-    }
+    // if (a.sortKey !== b.sortKey) {
+    //   return a.sortKey - b.sortKey;
+    // }
 
     if (a.levelPriority !== b.levelPriority) {
       return a.levelPriority - b.levelPriority;
@@ -108,9 +108,9 @@ const getAllSeeder = async (query: Record<string, any>, userMail: string) => {
 
     currentSeederWithProgress = {
       ...currentSeeder,
-      hasActiveSubscription: hasActiveSubscription(currentSeeder),
+      // hasActiveSubscription: hasActiveSubscription(currentSeeder),
       rank: rankedSeeders.findIndex(s => s.id === currentSeeder.id) + 1,
-      levelProgress, 
+      levelProgress,
       levelInfo: LEVEL_CONFIG[currentSeeder.level as keyof typeof LEVEL_CONFIG],
     };
   }
@@ -145,21 +145,21 @@ const getSeederByIdFromDB = async (id: string) => {
       isVerified: true,
       level: true,
       coin: true,
-      subscriptionStart: true,
-      subscriptionEnd: true,
-      subscription: { select: { id: true } },
-      challenge: {
-        select: {
-          title: true,
-          tags: true,
-          category: true,
-          seedPoints: true,
-        },
-        orderBy: {
-          createdAt: 'desc',
-        },
-        take: 10,
-      },
+      // subscriptionStart: true,
+      // subscriptionEnd: true,
+      // subscription: { select: { id: true } },
+      // challenge: {
+      //   select: {
+      //     title: true,
+      //     tags: true,
+      //     category: true,
+      //     seedPoints: true,
+      //   },
+      //   orderBy: {
+      //     createdAt: 'desc',
+      //   },
+      //   take: 10,
+      // },
     },
   });
 
@@ -167,7 +167,7 @@ const getSeederByIdFromDB = async (id: string) => {
     throw new Error('Seeder not found');
   }
 
-  const hasSubscription = hasActiveSubscription(seeder);
+  // const hasSubscription = hasActiveSubscription(seeder);
   // const coins = seeder.coin || 0;
   const currentLevel = seeder.level;
   const levelInfo = LEVEL_CONFIG[currentLevel as keyof typeof LEVEL_CONFIG];
@@ -177,22 +177,22 @@ const getSeederByIdFromDB = async (id: string) => {
       id: true,
       level: true,
       coin: true,
-      subscriptionStart: true,
-      subscriptionEnd: true,
+      // subscriptionStart: true,
+      // subscriptionEnd: true,
     },
   });
 
   const rankedSeeders = allSeeders
     .map(s => ({
       ...s,
-      hasSubscription: hasActiveSubscription(s),
+      // hasSubscription: hasActiveSubscription(s),
       levelPriority:
         LEVEL_CONFIG[s.level as keyof typeof LEVEL_CONFIG]?.priority || 5,
     }))
     .sort((a, b) => {
-      if (a.hasSubscription !== b.hasSubscription) {
-        return a.hasSubscription ? -1 : 1;
-      }
+      // if (a.hasSubscription !== b.hasSubscription) {
+      //   return a.hasSubscription ? -1 : 1;
+      // }
       if (a.levelPriority !== b.levelPriority) {
         return a.levelPriority - b.levelPriority;
       }
@@ -203,7 +203,7 @@ const getSeederByIdFromDB = async (id: string) => {
 
   return {
     ...seeder,
-    hasActiveSubscription: hasSubscription,
+    // hasActiveSubscription: hasSubscription,
     levelInfo,
     ranking: {
       currentRank: rank,

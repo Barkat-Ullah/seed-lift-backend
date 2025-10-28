@@ -3,8 +3,9 @@ import { Response } from 'express';
 type TMeta = {
   limit: number;
   page: number;
-  total: number;
+  total?: number;
   totalPage?: number;
+  commentsCount?:number;
 };
 
 

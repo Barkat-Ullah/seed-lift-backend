@@ -1,62 +1,80 @@
 model Challenge {
-    id          String          @id @default(auto()) @map("_id") @db.ObjectId
-    title       String
-    description String
-    category    String
-    attachment  String
-    tags        String[]
-    seedPoints  Int
-    deadline    DateTime
-    status      ChallengeStatus @default(PENDING)
-    isActive    Boolean         @default(true)
+  id            String             @id @default(auto()) @map("_id") @db.ObjectId
+  title         String
+  description   String
+  category      ChallengeCategory?
+  attachment    String?
+  tags          String[]
+  seedPoints    Int
+  deadline      DateTime
+  status        ChallengeStatus    @default(PENDING)
+  isActive      Boolean            @default(true)
+  isDeleted     Boolean            @default(false)
+  isAwarded     Boolean            @default(false)
+  inviteTalents String[]
 
-    founderId String @db.ObjectId
-    seederId  String @db.ObjectId
+  founderId String  @db.ObjectId
+  founder   Founder @relation(fields: [founderId], references: [id])
 
-    seeder  Seeder  @relation(fields: [seederId], references: [id])
-    founder Founder @relation(fields: [founderId], references: [id])
+  comment Comment[]
+  react   React[]
 
-    comment   Comment[]
-    createdAt DateTime  @default(now())
-    updatedAt DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-    @@map("challenge")
+  @@map("challenge")
 }
 
 model React {
-    id        String @id @default(auto()) @map("_id") @db.ObjectId
-    founderId String @db.ObjectId
-    seederId  String @db.ObjectId
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  founderId   String @db.ObjectId
+  seederId    String @db.ObjectId
+  challengeId String @db.ObjectId
 
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+  challenge Challenge @relation(fields: [challengeId], references: [id])
 
-    @@unique([founderId, seederId])
-    @@map("love_react")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([founderId, seederId, challengeId])
+  @@map("love_react")
 }
 
 model Comment {
-    id             String  @id @default(auto()) @map("_id") @db.ObjectId
-    content        String
-    image          String?
-    seederId       String  @db.ObjectId
-    challengeId    String  @db.ObjectId
-    parentId       String? @db.ObjectId
-    isFounderReply Boolean @default(false)
+  id             String  @id @default(auto()) @map("_id") @db.ObjectId
+  content        String
+  image          String?
+  seederId       String? @db.ObjectId
+  founderId      String? @db.ObjectId
+  challengeId    String  @db.ObjectId
+  parentId       String? @db.ObjectId
+  isFounderReply Boolean @default(false)
 
-    seeder Seeder @relation(fields: [seederId], references: [id])
+  // Relations
+  seeder    Seeder?    @relation(fields: [seederId], references: [id])
+  founder   Founder?   @relation(fields: [founderId], references: [id])
+  challenge Challenge? @relation(fields: [challengeId], references: [id])
+  parent    Comment?   @relation("CommentReplies", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies   Comment[]  @relation("CommentReplies")
 
-    challenge Challenge? @relation(fields: [challengeId], references: [id])
-    parent    Comment?   @relation("CommentReplies", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-    replies   Comment[]  @relation("CommentReplies")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-
-    @@map("comment")
+  @@map("comment")
 }
 
 enum ChallengeStatus {
-    PENDING
-    FINISHED
+  PENDING
+  FINISHED
+}
+
+enum ChallengeCategory {
+  Marketing
+  Design
+  Tech
+  Strategy
+  Finance
+  AI
+  HR
+  Content
 }

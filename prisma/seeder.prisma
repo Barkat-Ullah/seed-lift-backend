@@ -21,7 +21,7 @@ model Seeder {
     payment Payment[]
     comment Comment[]
 
-    challenge Challenge[]
+    // challenge Challenge[]
     createdAt DateTime    @default(now())
     updatedAt DateTime    @updatedAt
 

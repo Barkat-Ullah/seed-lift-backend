@@ -5,7 +5,7 @@ import { prisma } from '../utils/prisma';
 
 const adminData = {
   fullName: 'Admin',
-  email: 'admin1@gmail.com',
+  email: 'admin@gmail.com',
   password: '123456',
   phoneNumber: '01821558090',
   // fcmToken,

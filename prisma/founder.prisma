@@ -20,6 +20,7 @@ model Founder {
 
     challenge Challenge[]
     payment Payment[]
+    comment Comment[]
 
     createdAt DateTime    @default(now())
     updatedAt DateTime    @updatedAt
@@ -32,3 +33,6 @@ enum OrgTypeEnum {
     Established
     NGO
 }
+
+
+
