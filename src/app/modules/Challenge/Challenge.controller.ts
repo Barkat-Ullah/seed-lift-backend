@@ -75,16 +75,30 @@ const softDeleteIntoDb = catchAsync(async (req: Request, res: Response) => {
 
 const awardedPoints = catchAsync(async (req: Request, res: Response) => {
   const { challengeId } = req.params;
-  const { seederId } = req.body;
+  const { seederId, commentId } = req.body;
   const result = await ChallengeServices.awardSeedPoints(
     challengeId,
     seederId,
+    commentId,
     req.user?.email,
   );
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
     message: 'Seed points awarded successfully to the winner!',
+    data: result,
+  });
+});
+
+const updateUserStatus = catchAsync(async (req, res) => {
+  const founderMail = req.user.email;
+  // console.log(founderMail)
+  const { id } = req.params;
+  const result = await ChallengeServices.updateChallengeStatus(id, founderMail);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    message: 'Challenge status updated successfully',
     data: result,
   });
 });
@@ -97,4 +111,5 @@ export const ChallengeController = {
   updateIntoDb,
   softDeleteIntoDb,
   awardedPoints,
+  updateUserStatus,
 };

@@ -129,6 +129,12 @@ const getAllChallenge = async (query: Record<string, any>) => {
         isDeleted: true,
         isAwarded: true,
         inviteTalents: true,
+        _count: {
+          select: {
+            react: true,
+            comment: true,
+          },
+        },
         founder: {
           select: {
             id: true,
@@ -139,8 +145,6 @@ const getAllChallenge = async (query: Record<string, any>) => {
       },
     }),
     prisma.challenge.count({ where }),
-    // prisma.react.count(),
-    // prisma.comment.count(),
   ]);
 
   const now = new Date();
@@ -216,7 +220,14 @@ const getMyChallenge = async (email: string, query: Record<string, any>) => {
       status: true,
       isActive: true,
       isDeleted: true,
+      isAwarded: true,
       inviteTalents: true,
+      _count: {
+        select: {
+          react: true,
+          comment: true,
+        },
+      },
       founder: {
         select: {
           id: true,
@@ -224,21 +235,15 @@ const getMyChallenge = async (email: string, query: Record<string, any>) => {
           fullName: true,
         },
       },
-      comment: {
-        select: {
-          seeder: {
-            select: {
-              id: true,
-              fullName: true,
-              email: true,
-            },
-          },
-        },
-      },
     },
   });
 
-  return challenges;
+  const challenge = await prisma.challenge.count();
+  const activeChallenge = await prisma.challenge.count({
+    where: { isActive: true },
+  });
+
+  return { totalChallenge: challenge, activeChallenge, challenges };
 };
 
 const getChallengeByIdFromDB = async (id: string) => {
@@ -393,6 +398,7 @@ const softDeleteIntoDb = async (id: string) => {
 const awardSeedPoints = async (
   challengeId: string,
   seederId: string,
+  commentId: string,
   founderMail: string,
 ) => {
   const founder = await prisma.founder.findUnique({
@@ -440,40 +446,104 @@ const awardSeedPoints = async (
     );
   }
 
-  const [updateChallenge, updateSeeder] = await prisma.$transaction([
-    prisma.challenge.update({
-      where: { id: challengeId },
-      data: {
-        isAwarded: true,
-      },
-      select: {
-        id: true,
-        title: true,
-        seedPoints: true,
-        isAwarded: true,
-      },
-    }),
-    prisma.seeder.update({
-      where: {
-        id: seederId,
-      },
-      data: {
-        coin: { increment: challenge.seedPoints },
-      },
-      select: {
-        id: true,
-        fullName: true,
-        coin: true,
-        level: true,
-      },
-    }),
-  ]);
+  const targetComment = await prisma.comment.findFirst({
+    where: {
+      id: commentId,
+      isWin: false,
+    },
+  });
+
+  if (!targetComment) {
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      'No eligible comment found for this seeder',
+    );
+  }
+
+  const [updateChallenge, updatedComment, updateSeeder] =
+    await prisma.$transaction([
+      prisma.challenge.update({
+        where: { id: challengeId },
+        data: {
+          isAwarded: true,
+        },
+        select: {
+          id: true,
+          title: true,
+          seedPoints: true,
+          isAwarded: true,
+        },
+      }),
+      prisma.comment.update({
+        where: { id: targetComment.id },
+        data: { isWin: true },
+        select: { id: true, content: true, isWin: true },
+      }),
+      prisma.seeder.update({
+        where: {
+          id: seederId,
+        },
+        data: {
+          coin: { increment: challenge.seedPoints },
+        },
+        select: {
+          id: true,
+          fullName: true,
+          coin: true,
+          level: true,
+        },
+      }),
+    ]);
 
   return {
-    message: `${updateSeeder.fullName} awarded ${challenge.seedPoints} SP! New coin balance: ${updateSeeder.coin}`,
+    message: `${updateSeeder.fullName} awarded ${challenge.seedPoints} SP for comment "${updatedComment.content.slice(0, 50)}..."! New coin: ${updateSeeder.coin}`,
     updateChallenge,
+    updatedComment,
     updateSeeder,
   };
+
+  // return null;
+};
+
+const updateChallengeStatus = async (
+  challengeId: string,
+  founderEmail: string,
+) => {
+  // console.log(founderEmail)
+  const founder = await prisma.founder.findUnique({
+    where: {
+      email: founderEmail,
+    },
+  });
+  if (!founder) {
+    throw new AppError(httpStatus.NOT_FOUND, 'Founder not found');
+  }
+  const challenge = await prisma.challenge.findUnique({
+    where: {
+      id: challengeId,
+    },
+  });
+  if (!challenge) {
+    throw new AppError(httpStatus.NOT_FOUND, 'challenge not found');
+  }
+
+  const newStatus =
+    challenge.status === ChallengeStatus.PENDING
+      ? ChallengeStatus.FINISHED
+      : ChallengeStatus.PENDING;
+
+  const result = await prisma.challenge.update({
+    where: { id: challengeId },
+    data: { status: newStatus },
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      status: true,
+    },
+  });
+
+  return result;
 };
 
 export const ChallengeServices = {
@@ -484,4 +554,5 @@ export const ChallengeServices = {
   updateIntoDb,
   softDeleteIntoDb,
   awardSeedPoints,
+  updateChallengeStatus,
 };

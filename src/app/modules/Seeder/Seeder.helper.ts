@@ -1,4 +1,4 @@
-//  Level thresholds and priorities
+
 export const LEVEL_CONFIG = {
   Starter: { minCoins: 0, maxCoins: 5000, priority: 4 },
   Intermediate: { minCoins: 5000, maxCoins: 10000, priority: 3 },
@@ -6,7 +6,6 @@ export const LEVEL_CONFIG = {
   Pro: { minCoins: 35000, maxCoins: Infinity, priority: 1 },
 };
 
-//  Helper function to get level based on coins
 export const getLevelByCoins = (coins: number) => {
   if (coins >= 35000) return 'Pro';
   if (coins >= 10000) return 'Gold';
@@ -14,14 +13,12 @@ export const getLevelByCoins = (coins: number) => {
   return 'Starter';
 };
 
-//  Helper function to check if subscription is active
 export const hasActiveSubscription = (seeder: any) => {
   if (!seeder.subscriptionStart || !seeder.subscriptionEnd) return false;
   const now = new Date();
   return now >= seeder.subscriptionStart && now <= seeder.subscriptionEnd;
 };
 
-// Helper to calculate progress toward next level
 export const calculateLevelProgress = (currentLevel: string, coins: number) => {
   let nextLevel = null;
   let progressPercentage = 0;

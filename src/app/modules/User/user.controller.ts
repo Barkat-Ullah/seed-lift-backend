@@ -49,7 +49,6 @@ const updateUserStatus = catchAsync(async (req, res) => {
   });
 });
 
-
 const softDeleteUser = catchAsync(async (req, res) => {
   const id = req.user.id;
   const result = await UserServices.softDeleteUserIntoDB(id);
@@ -60,6 +59,7 @@ const softDeleteUser = catchAsync(async (req, res) => {
     data: result,
   });
 });
+
 const hardDeleteUser = catchAsync(async (req, res) => {
   const userId = req.user.id;
   const { id } = req.params;

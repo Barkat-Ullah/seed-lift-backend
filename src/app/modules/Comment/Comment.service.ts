@@ -181,6 +181,7 @@ const getCommentsByChallenge = async (
         challengeId: true,
         parentId: true,
         isFounderReply: true,
+        isWin: true,
         seeder: {
           select: {
             id: true,
@@ -271,6 +272,15 @@ const getCommentersByChallenge = async (challengeId: string) => {
           profile: true,
           level: true,
           coin: true,
+          comment: {
+            select: {
+              id: true,
+              content: true,
+              isWin: true,
+            },
+            orderBy: { createdAt: 'asc' },
+            take: 1,
+          },
         },
       },
     },
@@ -288,6 +298,7 @@ const getCommentersByChallenge = async (challengeId: string) => {
       Awarded: challenge.isAwarded,
       seedPoints: challenge.seedPoints,
       founder: challenge.founder,
+      status:challenge.status
     },
     commenters: uniqueCommenters,
   };

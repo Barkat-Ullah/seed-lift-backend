@@ -7,6 +7,7 @@ import { SeederRoutes } from '../modules/Seeder/Seeder.routes';
 import { ChallengeRoutes } from '../modules/Challenge/Challenge.routes';
 import { CommentRoutes } from '../modules/Comment/Comment.routes';
 import { ReactRoutes } from '../modules/React/React.routes';
+import { MetaRoutes } from '../modules/Meta/Meta.routes';
 
 const router = express.Router();
 
@@ -42,6 +43,10 @@ const moduleRoutes = [
   {
     path: '/react',
     route: ReactRoutes,
+  },
+  {
+    path: '/meta',
+    route: MetaRoutes,
   },
 ];
 

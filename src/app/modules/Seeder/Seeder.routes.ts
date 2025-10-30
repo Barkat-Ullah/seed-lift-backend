@@ -11,9 +11,20 @@ router.get(
   SeederController.getAllSeeder,
 );
 router.get(
+  '/my-rewards',
+  auth (UserRoleEnum.SEEDER, ),
+  SeederController.getMyRewards,
+);
+router.get(
+  '/profile',
+  auth(UserRoleEnum.SEEDER),
+  SeederController.getMySeederProfile,
+);
+router.get(
   '/:id',
   auth(UserRoleEnum.ADMIN, UserRoleEnum.SEEDER, UserRoleEnum.FOUNDER),
   SeederController.getSeederById,
 );
+
 
 export const SeederRoutes = router;

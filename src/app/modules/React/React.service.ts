@@ -11,7 +11,7 @@ const createReactIntoDb = async (
   seederMail: string,
   challengeId: string,
 ): Promise<ToggleResult> => {
-  // find seeder
+
   const seeder = await prisma.seeder.findUnique({
     where: { email: seederMail },
   });
@@ -20,7 +20,7 @@ const createReactIntoDb = async (
     throw new AppError(httpStatus.NOT_FOUND, 'Seeder not found');
   }
 
-  // find challenge
+ 
   const challenge = await prisma.challenge.findUnique({
     where: { id: challengeId },
   });
@@ -32,7 +32,7 @@ const createReactIntoDb = async (
   const founderId = challenge.founderId;
   const seederId = seeder.id;
 
-  // check existing react
+
   const existingReact = await prisma.react.findUnique({
     where: {
       founderId_seederId_challengeId: {
@@ -44,14 +44,14 @@ const createReactIntoDb = async (
   });
 
   if (existingReact) {
-    // remove if already exists (toggle off)
+   
     const deleted = await prisma.react.delete({
       where: { id: existingReact.id },
     });
     return { isFavorite: false, react: deleted };
   }
 
-  // create new react (toggle on)
+ 
   const created = await prisma.react.create({
     data: {
       founderId,

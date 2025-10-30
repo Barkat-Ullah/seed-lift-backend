@@ -14,8 +14,8 @@ model User {
 
   stripeCustomerId String?
 
-  // receiver Notification[] @relation("Receiver")
-  // sender   Notification[] @relation("Sender")
+  receiver Notification[] @relation("Receiver")
+  sender   Notification[] @relation("Sender")
 
   //relation by email
   admin   Admin?

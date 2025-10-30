@@ -49,6 +49,7 @@ model Comment {
   challengeId    String  @db.ObjectId
   parentId       String? @db.ObjectId
   isFounderReply Boolean @default(false)
+  isWin          Boolean @default(false)
 
   // Relations
   seeder    Seeder?    @relation(fields: [seederId], references: [id])

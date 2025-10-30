@@ -66,16 +66,16 @@ export async function setupWebSocket(server: Server) {
               return;
             }
 
-            const { id, role } = user; 
+            const { id, role } = user;
             ws.userId = id;
-            ws.role = role as UserRoleEnum; 
+            ws.role = role as UserRoleEnum;
             onlineUsers.add(id);
             userSockets.set(id, ws);
             console.log('User authenticated:', id, 'Role:', role);
 
             broadcastToAll(wss, {
               event: 'userStatus',
-              data: { userId: id, role: role, isOnline: true }, 
+              data: { userId: id, role: role, isOnline: true },
             });
             break;
           }
@@ -268,8 +268,8 @@ export async function setupWebSocket(server: Server) {
               where: { roomId: room.id },
               orderBy: { createdAt: 'asc' },
               include: {
-                sender: { select: { id: true, fullName: true, role: true } },
-                receiver: { select: { id: true, fullName: true, role: true } },
+                sender: { select: { id: true, email: true, role: true } }, // Changed: fullName -> email
+                receiver: { select: { id: true, email: true, role: true } }, // Changed: fullName -> email
               },
             });
 
@@ -362,8 +362,8 @@ export async function setupWebSocket(server: Server) {
               },
               include: {
                 chat: { orderBy: { createdAt: 'desc' }, take: 1 },
-                sender: { select: { id: true, fullName: true, role: true } },
-                receiver: { select: { id: true, fullName: true, role: true } },
+                sender: { select: { id: true, email: true, role: true } }, // Changed: fullName -> email
+                receiver: { select: { id: true, email: true, role: true } }, // Changed: fullName -> email
               },
             });
 
@@ -380,9 +380,9 @@ export async function setupWebSocket(server: Server) {
               return {
                 user: {
                   id: otherUser.id,
-                  fullName: otherUser.fullName,
+                  email: otherUser.email, // Changed: fullName -> email
                   role: otherUser.role,
-                }, // role add
+                },
                 lastMessage: room.chat[0],
               };
             });
@@ -401,7 +401,7 @@ export async function setupWebSocket(server: Server) {
             const onlineUserList = Array.from(onlineUsers);
             const users = await prisma.user.findMany({
               where: { id: { in: onlineUserList } },
-              select: { id: true, email: true, role: true },
+              select: { id: true, email: true, role: true }, // Already using email, no change needed
             });
             // Optional: Filter online users by valid roles for this sender
             const filteredUsers = users.filter(user =>
@@ -435,7 +435,7 @@ export async function setupWebSocket(server: Server) {
       const extendedWs = ws as ExtendedWebSocket;
       if (extendedWs.userId) {
         const userId = extendedWs.userId;
-        const role = extendedWs.role; 
+        const role = extendedWs.role;
         onlineUsers.delete(userId);
         userSockets.delete(userId);
         broadcastToAll(wss, {

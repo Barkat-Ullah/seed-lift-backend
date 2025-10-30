@@ -35,6 +35,12 @@ router.post(
   ChallengeController.awardedPoints,
 );
 
+router.put(
+  '/update-status/:id',
+  auth(UserRoleEnum.FOUNDER),
+  ChallengeController.updateUserStatus,
+);
+
 router.patch(
   '/:id',
   auth(UserRoleEnum.FOUNDER),

@@ -25,7 +25,29 @@ const getSeederById = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getMyRewards = catchAsync(async (req: Request, res: Response) => {
+  const result = await SeederServices.myRewards(req.user?.email);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Successfully retrieved my rewards',
+    data: result,
+  });
+});
+
+const getMySeederProfile = catchAsync(async (req: Request, res: Response) => {
+  const result = await SeederServices.getMySeederProfile(req.user?.email);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Successfully retrieved my profile',
+    data: result,
+  });
+});
+
 export const SeederController = {
   getAllSeeder,
   getSeederById,
+  getMyRewards,
+  getMySeederProfile,
 };

@@ -4,6 +4,7 @@ import QueryBuilder from '../../builder/QueryBuilder';
 import { prisma } from '../../utils/prisma';
 import AppError from '../../errors/AppError';
 import { uploadToDigitalOceanAWS } from '../../utils/uploadToDigitalOceanAWS';
+import { getLevelByCoins } from '../Seeder/Seeder.helper';
 
 interface UserWithOptionalPassword extends Omit<User, 'password'> {
   password?: string;
@@ -25,6 +26,9 @@ const getAllUsersFromDB = async (query: any) => {
       'founder.description',
     ])
     .filter()
+    .where({
+      isDeleted: false,
+    })
     .sort()
     .fields()
     .exclude()
@@ -98,8 +102,41 @@ const getMyProfileFromDB = async (id: string) => {
         isVerified: true,
         level: true,
         coin: true,
+        subscriptionStart: true,
+        subscriptionEnd: true,
+        subscription: { select: { id: true } },
+        comment: {
+          where: {
+            seederId: id,
+            isWin: true,
+            challenge: { isAwarded: true },
+          },
+          select: {
+            id: true,
+          },
+          orderBy: { updatedAt: 'desc' },
+          take: 10,
+        },
+        _count: {
+          select: {
+            comment: true,
+          },
+        },
       },
     });
+    if (profileInfo) {
+      const currentCoins = profileInfo.coin || 0;
+      const newLevel = getLevelByCoins(currentCoins);
+
+      if (newLevel !== profileInfo.level) {
+        await prisma.seeder.update({
+          where: { id: profileInfo.id },
+          data: { level: newLevel },
+        });
+
+        profileInfo.level = newLevel;
+      }
+    }
   } else if (user.role === UserRoleEnum.FOUNDER) {
     profileInfo = await prisma.founder.findUnique({
       where: { email: user.email },
@@ -161,21 +198,45 @@ const getUserDetailsFromDB = async (id: string) => {
       select: {
         id: true,
         fullName: true,
+        description: true,
         email: true,
         profile: true,
         phoneNumber: true,
-        description: true,
         skill: true,
         isVerified: true,
         level: true,
         coin: true,
-        subscription: {
-          select: {
-            id: true,
+        subscriptionStart: true,
+        subscriptionEnd: true,
+        subscription: { select: { id: true } },
+        comment: {
+          where: {
+            isWin: true,
+            challenge: { isAwarded: true },
           },
+          select: { id: true },
+          orderBy: { updatedAt: 'desc' },
+          take: 10,
+        },
+        _count: {
+          select: { comment: true },
         },
       },
     });
+    if (profileInfo) {
+      const founderReplyCount = await prisma.comment.count({
+        where: {
+          parent: {
+            seederId: profileInfo.id,
+          },
+          isFounderReply: true,
+        },
+      });
+      profileInfo = {
+        ...profileInfo,
+        founderReplyCount,
+      };
+    }
   } else if (user.role === UserRoleEnum.FOUNDER) {
     profileInfo = await prisma.founder.findUnique({
       where: { email: user.email },
@@ -195,6 +256,20 @@ const getUserDetailsFromDB = async (id: string) => {
         },
       },
     });
+
+    if (profileInfo) {
+      const totalChallenges = await prisma.challenge.count({
+        where: { founderId: profileInfo.id },
+      });
+      const awardedChallenges = await prisma.challenge.count({
+        where: { founderId: profileInfo.id, isAwarded: true },
+      });
+      profileInfo = {
+        ...profileInfo,
+        totalChallenges,
+        awardedChallenges,
+      };
+    }
   }
 
   if (!profileInfo) {
