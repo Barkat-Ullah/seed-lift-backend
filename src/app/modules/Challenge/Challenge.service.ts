@@ -418,7 +418,7 @@ const awardSeedPoints = async (
   });
 
   if (!challenge) {
-    throw new AppError(httpStatus.NOT_FOUND, 'Challenge not found');
+    throw new AppError(httpStatus.NOT_FOUND, 'Challenge not found / or challenge status not Finished');
   }
 
   if (challenge.isAwarded) {

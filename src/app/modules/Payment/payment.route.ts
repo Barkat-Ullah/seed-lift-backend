@@ -16,11 +16,15 @@ router.get(
   auth(UserRoleEnum.ADMIN),
   PaymentController.getSingleForAdmin,
 );
-router.get('/', auth(UserRoleEnum.USER), PaymentController.getAllForUser);
-router.get('/:id', auth(UserRoleEnum.USER), PaymentController.getSingleForUser);
+router.get('/', auth(UserRoleEnum.ADMIN,UserRoleEnum.FOUNDER,UserRoleEnum.SEEDER), PaymentController.getAllForUser);
+router.get(
+  '/:id',
+  auth(UserRoleEnum.ADMIN, UserRoleEnum.FOUNDER, UserRoleEnum.SEEDER),
+  PaymentController.getSingleForUser,
+);
 router.get(
   '/session/:stripeSessionId',
-  auth(UserRoleEnum.USER),
+  auth(UserRoleEnum.FOUNDER,UserRoleEnum.SEEDER),
   PaymentController.singleTransactionHistoryBySessionId,
 );
 

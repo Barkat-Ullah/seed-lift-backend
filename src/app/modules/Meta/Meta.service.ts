@@ -88,7 +88,7 @@ const getAdminMeta = async (adminMail: string, period: string = 'monthly') => {
       });
       return {
         ...founder,
-        count: awardedCount, 
+        announceReward: awardedCount, 
       };
     }),
   );
@@ -128,7 +128,7 @@ const getAdminMeta = async (adminMail: string, period: string = 'monthly') => {
       });
       return {
         ...seeder,
-        count: winCount, 
+        winningCount: winCount, 
       };
     }),
   );

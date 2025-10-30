@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { ChallengeStatus, Prisma } from '@prisma/client';
 import { prisma } from '../../utils/prisma';
 import {
   calculateLevelProgress,
@@ -233,105 +233,147 @@ const getSeederByIdFromDB = async (id: string) => {
     totalReplies: founderReplyCount,
     successRate:
       seeder._count.comment > 0
-        ? Math.round((seeder.comment.length / seeder._count.comment) * 100)
+        ? Math.round((seeder?.comment?.length / seeder?._count?.comment) * 100)
         : 0,
   };
 };
 
-const getMySeederProfile = async (seederMail: string) => {
+// const getMySeederChallenges = async (seederMail: string) => {
+//   const seeder = await prisma.seeder.findUnique({
+//     where: { email: seederMail },
+//     select: {
+//       id: true,
+//       fullName: true,
+//       description: true,
+//       email: true,
+//       profile: true,
+//       phoneNumber: true,
+//       skill: true,
+//       isVerified: true,
+//       level: true,
+//       coin: true,
+//       subscriptionStart: true,
+//       subscriptionEnd: true,
+//       subscription: { select: { id: true } },
+//       comment: {
+//         where: {
+//           isWin: true,
+//           challenge: { isAwarded: true },
+//         },
+//         select: { id: true },
+//         orderBy: { updatedAt: 'desc' },
+//         take: 10,
+//       },
+//       _count: {
+//         select: { comment: true },
+//       },
+//     },
+//   });
+
+//   if (!seeder) {
+//     throw new Error('Seeder not found');
+//   }
+
+//   const hasSubscription = hasActiveSubscription(seeder);
+//   const currentLevel = seeder.level;
+//   const levelInfo = LEVEL_CONFIG[currentLevel as keyof typeof LEVEL_CONFIG];
+
+//   const allSeeders = await prisma.seeder.findMany({
+//     select: {
+//       id: true,
+//       level: true,
+//       coin: true,
+//       subscriptionStart: true,
+//       subscriptionEnd: true,
+//     },
+//   });
+
+//   const rankedSeeders = allSeeders
+//     .map(s => ({
+//       ...s,
+//       hasSubscription: hasActiveSubscription(s),
+//       levelPriority:
+//         LEVEL_CONFIG[s.level as keyof typeof LEVEL_CONFIG]?.priority || 5,
+//     }))
+//     .sort((a, b) => {
+//       if (a.hasSubscription !== b.hasSubscription) {
+//         return a.hasSubscription ? -1 : 1;
+//       }
+//       if (a.levelPriority !== b.levelPriority) {
+//         return a.levelPriority - b.levelPriority;
+//       }
+//       return (b.coin || 0) - (a.coin || 0);
+//     });
+
+//   const rank = rankedSeeders.findIndex(s => s.id === seeder.id) + 1;
+
+//   const founderReplyCount = await prisma.comment.count({
+//     where: {
+//       parent: {
+//         seederId: seeder?.id,
+//       },
+//       isFounderReply: true,
+//     },
+//   });
+
+//   return {
+//     ...seeder,
+//     hasActiveSubscription: hasSubscription,
+//     levelInfo,
+//     ranking: {
+//       currentRank: rank,
+//       totalSeeders: allSeeders.length,
+//     },
+//     founderReplyCount,
+//     totalWins: seeder.comment.length,
+//     totalReplies: seeder._count.comment,
+//     successRate:
+//       seeder._count.comment > 0
+//         ? Math.round((seeder.comment.length / seeder._count.comment) * 100)
+//         : 0,
+//   };
+// };
+
+const getMySeederChallenges = async (seederMail: string) => {
   const seeder = await prisma.seeder.findUnique({
     where: { email: seederMail },
-    select: {
-      id: true,
-      fullName: true,
-      description: true,
-      email: true,
-      profile: true,
-      phoneNumber: true,
-      skill: true,
-      isVerified: true,
-      level: true,
-      coin: true,
-      subscriptionStart: true,
-      subscriptionEnd: true,
-      subscription: { select: { id: true } },
-      comment: {
-        where: {
-          isWin: true,
-          challenge: { isAwarded: true },
-        },
-        select: { id: true },
-        orderBy: { updatedAt: 'desc' },
-        take: 10,
-      },
-      _count: {
-        select: { comment: true },
-      },
-    },
   });
 
   if (!seeder) {
     throw new Error('Seeder not found');
   }
 
-  const hasSubscription = hasActiveSubscription(seeder);
-  const currentLevel = seeder.level;
-  const levelInfo = LEVEL_CONFIG[currentLevel as keyof typeof LEVEL_CONFIG];
-
-  const allSeeders = await prisma.seeder.findMany({
+  const myCommentsSeed = await prisma.comment.findMany({
+    where: {
+      seederId: seeder.id,
+      challenge: {
+        status: 'PENDING', 
+      },
+    },
     select: {
       id: true,
-      level: true,
-      coin: true,
-      subscriptionStart: true,
-      subscriptionEnd: true,
-    },
-  });
-
-  const rankedSeeders = allSeeders
-    .map(s => ({
-      ...s,
-      hasSubscription: hasActiveSubscription(s),
-      levelPriority:
-        LEVEL_CONFIG[s.level as keyof typeof LEVEL_CONFIG]?.priority || 5,
-    }))
-    .sort((a, b) => {
-      if (a.hasSubscription !== b.hasSubscription) {
-        return a.hasSubscription ? -1 : 1;
-      }
-      if (a.levelPriority !== b.levelPriority) {
-        return a.levelPriority - b.levelPriority;
-      }
-      return (b.coin || 0) - (a.coin || 0);
-    });
-
-  const rank = rankedSeeders.findIndex(s => s.id === seeder.id) + 1;
-
-  const founderReplyCount = await prisma.comment.count({
-    where: {
-      parent: {
-        seederId: seeder?.id,
+      content: true,
+      challenge: {
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          tags: true,
+          status: true,
+          category: true,
+          seedPoints: true,
+          _count: {
+            select: {
+              react: true,
+              comment: true,
+            },
+          },
+        },
       },
-      isFounderReply: true,
     },
   });
 
-  return {
-    ...seeder,
-    hasActiveSubscription: hasSubscription,
-    levelInfo,
-    ranking: {
-      currentRank: rank,
-      totalSeeders: allSeeders.length,
-    },
-    founderReplyCount,
-    totalWins: seeder.comment.length,
-    totalReplies: seeder._count.comment,
-    successRate:
-      seeder._count.comment > 0
-        ? Math.round((seeder.comment.length / seeder._count.comment) * 100)
-        : 0,
-  };
+  return myCommentsSeed;
 };
 
 const myRewards = async (seederMail: string) => {
@@ -418,5 +460,5 @@ export const SeederServices = {
   getSeederByIdFromDB,
   updateSeederLevel,
   myRewards,
-  getMySeederProfile,
+  getMySeederChallenges,
 };

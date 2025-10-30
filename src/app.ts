@@ -1,4 +1,4 @@
-import express, { Application } from 'express';
+import express, { Application, Request, Response } from 'express';
 import globalErrorHandler from './app/middlewares/globalErrorHandler';
 import router from './app/routes';
 import auth from './app/middlewares/auth';
@@ -36,12 +36,12 @@ app.post(
 );
 
 // Root route (Better: JSON response with icon)
-//* app.get('/', (req: Request, res: Response) => {
-//   res.send({
-//     Message: 'The server is running. . .',
-//   });
-// });
-app.get('/', rootHandler);
+app.get('/', (req: Request, res: Response) => {
+  res.send({
+    Message: 'The server is running. . .',
+  });
+});
+// app.get('/', rootHandler);
 app.get('/health', serverHealth);
 
 // 404 handler (before global error)

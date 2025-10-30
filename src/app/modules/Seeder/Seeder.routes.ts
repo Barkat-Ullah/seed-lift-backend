@@ -16,7 +16,7 @@ router.get(
   SeederController.getMyRewards,
 );
 router.get(
-  '/profile',
+  '/my-seed',
   auth(UserRoleEnum.SEEDER),
   SeederController.getMySeederProfile,
 );

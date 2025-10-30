@@ -107,7 +107,7 @@ const getMyProfileFromDB = async (id: string) => {
         subscription: { select: { id: true } },
         comment: {
           where: {
-            seederId: id,
+            // seederId: id,
             isWin: true,
             challenge: { isAwarded: true },
           },
@@ -149,6 +149,16 @@ const getMyProfileFromDB = async (id: string) => {
         description: true,
         businessName: true,
         orgType: true,
+        subscription: {
+          select: {
+            id: true,
+            title: true,
+            price: true,
+            duration: true,
+          },
+        },
+        subscriptionStart: true,
+        subscriptionEnd: true,
       },
     });
   }

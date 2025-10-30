@@ -36,11 +36,11 @@ const getMyRewards = catchAsync(async (req: Request, res: Response) => {
 });
 
 const getMySeederProfile = catchAsync(async (req: Request, res: Response) => {
-  const result = await SeederServices.getMySeederProfile(req.user?.email);
+  const result = await SeederServices.getMySeederChallenges(req.user?.email);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Successfully retrieved my profile',
+    message: 'Successfully retrieved my seed challenge',
     data: result,
   });
 });

@@ -220,12 +220,12 @@ const notifications = await prisma.notification.findMany({
     sender: {
       select: {
         email: true,
-        coach: {
-          select: {
-            fullName: true,
-            profile: true,
-          },
-        },
+        // coach: {
+        //   select: {
+        //     fullName: true,
+        //     profile: true,
+        //   },
+        // },
       },
     },
   },
