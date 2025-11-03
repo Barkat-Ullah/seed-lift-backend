@@ -20,7 +20,6 @@ const createReactIntoDb = async (
     throw new AppError(httpStatus.NOT_FOUND, 'Seeder not found');
   }
 
- 
   const challenge = await prisma.challenge.findUnique({
     where: { id: challengeId },
   });

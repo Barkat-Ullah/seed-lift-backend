@@ -4,7 +4,7 @@ import httpStatus from 'http-status';
 import { Secret, SignOptions } from 'jsonwebtoken';
 import config from '../../../config';
 import AppError from '../../errors/AppError';
-import { UserRoleEnum, UserStatus } from '@prisma/client';
+import { SkillCategory, UserRoleEnum, UserStatus } from '@prisma/client';
 import { Response } from 'express';
 import {
   getOtpStatusMessage,
@@ -98,8 +98,11 @@ const registerWithOtpIntoDB = async (payload: any) => {
   const hashedPassword = await bcrypt.hash(payload.password, 12);
   const otp = generateOTP().toString();
 
-  const skills = toStringArray(payload.skill);
-
+  const skills = (payload.skill as string[])
+    .map(s => s.trim())
+    .filter((s): s is SkillCategory =>
+      Object.values(SkillCategory).includes(s as SkillCategory),
+    );
   try {
     await prisma.$transaction(async tx => {
       const newUser = await tx.user.create({

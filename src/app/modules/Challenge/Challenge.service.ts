@@ -1,9 +1,15 @@
 import { Request } from 'express';
 import { prisma } from '../../utils/prisma';
 import { uploadToDigitalOceanAWS } from '../../utils/uploadToDigitalOceanAWS';
-import { ChallengeStatus, ChallengeCategory } from '@prisma/client';
+import {
+  ChallengeStatus,
+  ChallengeCategory,
+  ChallengeType,
+} from '@prisma/client';
 import AppError from '../../errors/AppError';
 import httpStatus from 'http-status';
+import { hasActiveSubscription } from '../Seeder/Seeder.helper';
+import { updateChallengesWithRemainingDays } from './Challenge.constrant';
 
 const createIntoDb = async (req: Request) => {
   const {
@@ -15,6 +21,7 @@ const createIntoDb = async (req: Request) => {
     category,
     description,
     title,
+    challengeType,
   } = JSON.parse(req.body.data);
 
   const founderMail = req.user.email;
@@ -48,6 +55,7 @@ const createIntoDb = async (req: Request) => {
   // Create challenge
   const challenge = await prisma.challenge.create({
     data: {
+      challengeType: challengeType as ChallengeType,
       title,
       description,
       category: category as ChallengeCategory,
@@ -60,14 +68,17 @@ const createIntoDb = async (req: Request) => {
       founderId: founder.id,
     },
   });
-  console.log(challenge);
   return challenge;
 };
 
-const getAllChallenge = async (query: Record<string, any>) => {
+const getAllChallenge = async (
+  query: Record<string, any>,
+  seederMail: string,
+) => {
   const {
     searchTerm,
     category,
+    challengeType,
     tags,
     minSeedPoints,
     maxSeedPoints,
@@ -80,7 +91,6 @@ const getAllChallenge = async (query: Record<string, any>) => {
   const skip = (parseInt(page) - 1) * parseInt(limit);
   const take = parseInt(limit);
 
-  // Build where clause
   const where: any = {
     isDeleted: false,
     isActive: true,
@@ -108,72 +118,120 @@ const getAllChallenge = async (query: Record<string, any>) => {
     if (maxSeedPoints) where.seedPoints.lte = parseInt(maxSeedPoints);
   }
 
-  // Fetch challenges and count
-  const [challenges, total] = await Promise.all([
-    prisma.challenge.findMany({
-      where,
-      skip,
-      take,
-      orderBy: { [sortBy]: sortOrder },
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        category: true,
-        attachment: true,
-        tags: true,
-        seedPoints: true,
-        deadline: true,
-        status: true,
-        isActive: true,
-        isDeleted: true,
-        isAwarded: true,
-        inviteTalents: true,
-        _count: {
-          select: {
-            react: true,
-            comment: true,
-          },
-        },
-        founder: {
-          select: {
-            id: true,
-            email: true,
-            fullName: true,
-          },
+  if (challengeType) {
+    where.challengeType = challengeType;
+  }
+
+  const seeder = await prisma.seeder.findUnique({
+    where: {
+      email: seederMail,
+    },
+    select: {
+      id: true,
+      fullName: true,
+      isPro: true,
+      subscription: true,
+      subscriptionStart: true,
+      subscriptionEnd: true,
+      skill: true,
+    },
+  });
+
+  const allChallenges = await prisma.challenge.findMany({
+    where,
+    orderBy: { [sortBy]: sortOrder },
+    select: {
+      id: true,
+      title: true,
+      challengeType: true,
+      description: true,
+      category: true,
+      attachment: true,
+      tags: true,
+      seedPoints: true,
+      deadline: true,
+      status: true,
+      isActive: true,
+      isDeleted: true,
+      isAwarded: true,
+      inviteTalents: true,
+      _count: {
+        select: {
+          react: true,
+          comment: true,
         },
       },
-    }),
-    prisma.challenge.count({ where }),
-  ]);
+      founder: {
+        select: {
+          id: true,
+          email: true,
+          fullName: true,
+          subscriptionId: true,
+        },
+      },
+      createdAt: true,
+    },
+  });
 
   const now = new Date();
 
-  const updatedChallenges = await Promise.all(
-    challenges.map(async challenge => {
-      let remainingDays = 0;
-
-      if (challenge.deadline) {
-        const diffMs = new Date(challenge.deadline).getTime() - now.getTime();
-        remainingDays = Math.max(Math.ceil(diffMs / (1000 * 60 * 60 * 24)), 0);
-      }
-
-      if (remainingDays === 0 && challenge.isActive) {
-        await prisma.challenge.update({
-          where: { id: challenge.id },
-          data: { isActive: false, status: ChallengeStatus.FINISHED },
-        });
-      }
-
-      return {
-        ...challenge,
-        remainingDays,
-      };
-    }),
+  const updatedAllChallenges = await updateChallengesWithRemainingDays(
+    allChallenges,
+    now,
   );
 
+  let filteredChallenges = updatedAllChallenges.filter(challenge => {
+    if (challenge.challengeType === 'Public') {
+      return true;
+    }
+    if (!seeder || !seeder.id) {
+      return false;
+    }
+    return challenge.inviteTalents.includes(seeder.id);
+  });
+
+  let finalChallenges = filteredChallenges;
+  if (seeder && seeder.id) {
+    const hasSubscription = seeder.isPro || hasActiveSubscription(seeder);
+    const seederSkills = seeder.skill || [];
+
+    finalChallenges = filteredChallenges
+      .map(challenge => {
+        let score = 0;
+        const isMatch = seederSkills.includes(challenge.category);
+
+        if (isMatch) {
+          score += 2;
+          if (hasSubscription) {
+            score += 1;
+          }
+        }
+        return { ...challenge, _tempScore: score };
+      })
+      .sort((a, b) => {
+        if (a._tempScore !== b._tempScore) {
+          return b._tempScore - a._tempScore;
+        }
+
+        return (
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+      })
+      .map(({ _tempScore, ...challenge }) => challenge)
+      .slice(skip, skip + take);
+  } else {
+    finalChallenges = filteredChallenges
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      )
+      .slice(skip, skip + take);
+  }
+
+  const total = filteredChallenges.length;
+
   return {
-    data: updatedChallenges,
+    data: finalChallenges,
     meta: {
       page: parseInt(page),
       limit: parseInt(limit),
@@ -212,6 +270,7 @@ const getMyChallenge = async (email: string, query: Record<string, any>) => {
       id: true,
       title: true,
       description: true,
+      challengeType: true,
       category: true,
       attachment: true,
       tags: true,
@@ -253,6 +312,7 @@ const getChallengeByIdFromDB = async (id: string) => {
       id: true,
       title: true,
       description: true,
+      challengeType: true,
       category: true,
       attachment: true,
       tags: true,
@@ -418,7 +478,10 @@ const awardSeedPoints = async (
   });
 
   if (!challenge) {
-    throw new AppError(httpStatus.NOT_FOUND, 'Challenge not found / or challenge status not Finished');
+    throw new AppError(
+      httpStatus.NOT_FOUND,
+      'Challenge not found / or challenge status not Finished',
+    );
   }
 
   if (challenge.isAwarded) {
@@ -460,6 +523,25 @@ const awardSeedPoints = async (
     );
   }
 
+  const seeder = await prisma.seeder.findUnique({
+    where: {
+      id: seederId,
+    },
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+      coin: true,
+    },
+  });
+
+  //* seeder with active subscription add extra 25% coin
+  const seederWithActiveSubscription = hasActiveSubscription(seeder);
+  const basePoints = challenge.seedPoints;
+  const awardedPoints = seederWithActiveSubscription
+    ? Math.floor(basePoints * 1.25)
+    : basePoints;
+
   const [updateChallenge, updatedComment, updateSeeder] =
     await prisma.$transaction([
       prisma.challenge.update({
@@ -484,7 +566,7 @@ const awardSeedPoints = async (
           id: seederId,
         },
         data: {
-          coin: { increment: challenge.seedPoints },
+          coin: { increment: awardedPoints },
         },
         select: {
           id: true,

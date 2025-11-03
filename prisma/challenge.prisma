@@ -1,5 +1,6 @@
 model Challenge {
   id            String             @id @default(auto()) @map("_id") @db.ObjectId
+  challengeType ChallengeType
   title         String
   description   String
   category      ChallengeCategory?
@@ -23,6 +24,10 @@ model Challenge {
   updatedAt DateTime @updatedAt
 
   @@map("challenge")
+
+  @@index([status, isActive, isDeleted, isAwarded])
+  @@index([category])
+  @@index([challengeType])
 }
 
 model React {
@@ -64,18 +69,30 @@ model Comment {
   @@map("comment")
 }
 
+enum ChallengeType {
+  Public
+  Private
+}
+
 enum ChallengeStatus {
   PENDING
   FINISHED
 }
 
 enum ChallengeCategory {
-  Marketing
-  Design
-  Tech
-  Strategy
-  Finance
-  AI
-  HR
-  Content
+    Marketing_and_Growth
+    Design_and_Creative
+    Development_and_Tech
+    Business_Strategy_and_Operation
+    Finance_and_Investment
+    Human_Resource_and_Culture
+    Legal_and_Compliance
+    Customer_Support_and_Communication
+    Project_Management_and_Operations
+    Creative_Writing_and_Content
+    Learning_and_Education
+    Innovation_and_Future
+    General_and_Soft
+    AI
+    Others
 }

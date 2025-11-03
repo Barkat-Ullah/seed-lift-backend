@@ -1,4 +1,9 @@
-import { ChallengeStatus, Prisma } from '@prisma/client';
+import {
+  ChallengeStatus,
+  ChallengeType,
+  LevelEnum,
+  Prisma,
+} from '@prisma/client';
 import { prisma } from '../../utils/prisma';
 import {
   calculateLevelProgress,
@@ -10,12 +15,10 @@ import {
 // Get All Seeders with Ranking
 // ============================================
 const getAllSeeder = async (query: Record<string, any>, userMail: string) => {
-  const { searchTerm, level, page = 1, limit = 10 } = query;
+  const { searchTerm, level, page = 1, limit = 15 } = query;
 
   const currentSeeder = await prisma.seeder.findUnique({
-    where: {
-      email: userMail,
-    },
+    where: { email: userMail },
     select: {
       id: true,
       fullName: true,
@@ -27,7 +30,7 @@ const getAllSeeder = async (query: Record<string, any>, userMail: string) => {
     },
   });
 
-  // Filter conditions
+  // Filtering conditions
   const whereConditions: Prisma.SeederWhereInput[] = [];
 
   if (searchTerm) {
@@ -40,12 +43,10 @@ const getAllSeeder = async (query: Record<string, any>, userMail: string) => {
   }
 
   if (level) {
-    whereConditions.push({
-      level: level,
-    });
+    whereConditions.push({ level });
   }
 
-  // all seeders
+  // Get all seeders
   const seeders = await prisma.seeder.findMany({
     where: whereConditions.length > 0 ? { AND: whereConditions } : {},
     select: {
@@ -60,11 +61,25 @@ const getAllSeeder = async (query: Record<string, any>, userMail: string) => {
       subscriptionEnd: true,
       createdAt: true,
     },
-    take: 15,
   });
 
-  // add Ranking metadata
-  const seedersWithRanking = seeders.map(seeder => {
+  // ✅ Add totalWin for each seeder
+  const seedersWithWin = await Promise.all(
+    seeders.map(async seeder => {
+      const totalWin = await prisma.comment.count({
+        where: {
+          seederId: seeder.id,
+          isWin: true,
+          challenge: { isAwarded: true },
+        },
+      });
+
+      return { ...seeder, totalWin };
+    }),
+  );
+
+  // ✅ Add ranking metadata
+  const seedersWithRanking = seedersWithWin.map(seeder => {
     const hasSubscription = hasActiveSubscription(seeder);
     const levelPriority =
       LEVEL_CONFIG[seeder.level as keyof typeof LEVEL_CONFIG]?.priority || 5;
@@ -77,19 +92,15 @@ const getAllSeeder = async (query: Record<string, any>, userMail: string) => {
     };
   });
 
-  // Ranking sort
+  // ✅ Sort seeders
   seedersWithRanking.sort((a, b) => {
-    if (a.sortKey !== b.sortKey) {
-      return a.sortKey - b.sortKey;
-    }
-
-    if (a.levelPriority !== b.levelPriority) {
+    if (a.sortKey !== b.sortKey) return a.sortKey - b.sortKey;
+    if (a.levelPriority !== b.levelPriority)
       return a.levelPriority - b.levelPriority;
-    }
-
     return (b.coin || 0) - (a.coin || 0);
   });
 
+  // ✅ Add rank
   const rankedSeeders = seedersWithRanking.map((seeder, index) => ({
     ...seeder,
     rank: index + 1,
@@ -99,6 +110,7 @@ const getAllSeeder = async (query: Record<string, any>, userMail: string) => {
   const skip = (Number(page) - 1) * Number(limit);
   const paginatedSeeders = rankedSeeders.slice(skip, skip + Number(limit));
 
+  // ✅ Current seeder with progress
   let currentSeederWithProgress = null;
   if (currentSeeder) {
     const levelProgress = calculateLevelProgress(
@@ -108,8 +120,8 @@ const getAllSeeder = async (query: Record<string, any>, userMail: string) => {
 
     currentSeederWithProgress = {
       ...currentSeeder,
-      hasActiveSubscription: hasActiveSubscription(currentSeeder),
       rank: rankedSeeders.findIndex(s => s.id === currentSeeder.id) + 1,
+      hasActiveSubscription: hasActiveSubscription(currentSeeder),
       levelProgress,
       levelInfo: LEVEL_CONFIG[currentSeeder.level as keyof typeof LEVEL_CONFIG],
     };
@@ -127,6 +139,7 @@ const getAllSeeder = async (query: Record<string, any>, userMail: string) => {
   };
 };
 
+
 // Get Single Seeder by ID
 // ============================================
 const getSeederByIdFromDB = async (id: string) => {
@@ -142,7 +155,7 @@ const getSeederByIdFromDB = async (id: string) => {
       profile: true,
       phoneNumber: true,
       skill: true,
-      isVerified: true,
+      isPro: true,
       level: true,
       coin: true,
       subscriptionStart: true,
@@ -216,9 +229,11 @@ const getSeederByIdFromDB = async (id: string) => {
         isFounderReply: true,
       },
     });
+   
   } catch (error) {
     console.error('Error fetching founder reply count:', error);
     founderReplyCount = 0;
+   
   }
 
   return {
@@ -229,7 +244,7 @@ const getSeederByIdFromDB = async (id: string) => {
       currentRank: rank,
       totalSeeders: allSeeders.length,
     },
-    totalWins: seeder.comment.length,
+    totalWins: seeder.comment?.length || 0,
     totalReplies: founderReplyCount,
     successRate:
       seeder._count.comment > 0
@@ -249,7 +264,7 @@ const getSeederByIdFromDB = async (id: string) => {
 //       profile: true,
 //       phoneNumber: true,
 //       skill: true,
-//       isVerified: true,
+//       isPro: true,
 //       level: true,
 //       coin: true,
 //       subscriptionStart: true,
@@ -343,16 +358,54 @@ const getMySeederChallenges = async (seederMail: string) => {
     throw new Error('Seeder not found');
   }
 
-  const myCommentsSeed = await prisma.comment.findMany({
+  // 🧩 Seeder invited challenges
+  const challenge = await prisma.challenge.findMany({
+    where: {
+      challengeType: 'Private',
+      inviteTalents: {
+        hasSome: [seeder.id],
+      },
+      isDeleted: false,
+      isActive: true,
+      status: 'PENDING',
+    },
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      category: true,
+      tags: true,
+      seedPoints: true,
+      deadline: true,
+      status: true,
+      challengeType: true,
+      _count: {
+        select: {
+          react: true,
+          comment: true,
+        },
+      },
+      founder: {
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  // 💬 Seeder commented challenges
+  const myCommentedChallenges = await prisma.comment.findMany({
     where: {
       seederId: seeder.id,
       challenge: {
-        status: 'PENDING', 
+        status: 'PENDING',
       },
     },
     select: {
       id: true,
-      content: true,
       challenge: {
         select: {
           id: true,
@@ -362,6 +415,14 @@ const getMySeederChallenges = async (seederMail: string) => {
           status: true,
           category: true,
           seedPoints: true,
+          deadline: true,
+          founder: {
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+            },
+          },
           _count: {
             select: {
               react: true,
@@ -373,7 +434,35 @@ const getMySeederChallenges = async (seederMail: string) => {
     },
   });
 
-  return myCommentsSeed;
+  // 🧠 Step 1: make two arrays
+  const invited = challenge.map(ch => ({
+    ...ch,
+    type: 'invited',
+  }));
+
+  const commented = myCommentedChallenges.map(c => ({
+    ...c.challenge,
+    type: 'commented',
+  }));
+
+  // ⚙️ Step 2: merge intelligently (commented will override invited)
+  const map = new Map();
+
+  // first add invited challenges
+  for (const ch of invited) {
+    map.set(ch.id, ch);
+  }
+
+  // then overwrite if same challenge commented
+  for (const ch of commented) {
+    map.set(ch.id, ch);
+  }
+
+  const finalChallenges = Array.from(map.values());
+
+  return {
+    data: finalChallenges,
+  };
 };
 
 const myRewards = async (seederMail: string) => {

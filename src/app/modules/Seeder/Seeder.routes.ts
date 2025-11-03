@@ -18,7 +18,7 @@ router.get(
 router.get(
   '/my-seed',
   auth(UserRoleEnum.SEEDER),
-  SeederController.getMySeederProfile,
+  SeederController.getMySeederChallenge,
 );
 router.get(
   '/:id',

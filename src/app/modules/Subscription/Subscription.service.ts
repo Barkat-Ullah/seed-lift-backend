@@ -187,6 +187,7 @@ const assignSubscriptionToUser = async (userEmail: string, payload: any) => {
         : prisma.seeder.update({
             where: { email: userEmail },
             data: {
+              isPro: true,
               subscriptionId: subscription.id,
               subscriptionStart: startDate,
               subscriptionEnd: endDate,
@@ -258,6 +259,7 @@ const getUserSubscription = async (userEmail: string) => {
         : prisma.seeder.update({
             where: { email: userEmail },
             data: {
+              isPro: false,
               subscriptionId: null,
               subscriptionStart: null,
               subscriptionEnd: null,

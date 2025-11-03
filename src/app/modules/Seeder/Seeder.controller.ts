@@ -35,19 +35,21 @@ const getMyRewards = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-const getMySeederProfile = catchAsync(async (req: Request, res: Response) => {
-  const result = await SeederServices.getMySeederChallenges(req.user?.email);
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: 'Successfully retrieved my seed challenge',
-    data: result,
-  });
-});
+const getMySeederChallenge = catchAsync(
+  async (req: Request, res: Response) => {
+    const result = await SeederServices.getMySeederChallenges(req.user?.email);
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: 'Successfully retrieved my seed challenge',
+      data: result.data,
+    });
+  },
+);
 
 export const SeederController = {
   getAllSeeder,
   getSeederById,
   getMyRewards,
-  getMySeederProfile,
+  getMySeederChallenge,
 };

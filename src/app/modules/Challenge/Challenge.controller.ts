@@ -15,7 +15,8 @@ const createIntoDb = catchAsync(async (req: Request, res: Response) => {
 });
 
 const getAllChallenge = catchAsync(async (req: Request, res: Response) => {
-  const result = await ChallengeServices.getAllChallenge(req.query);
+  const seederMail = req.user?.email
+  const result = await ChallengeServices.getAllChallenge(req.query,seederMail);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -85,7 +86,8 @@ const awardedPoints = catchAsync(async (req: Request, res: Response) => {
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Seed points awarded successfully to the winner!',
+    message:
+      result.message || 'Seed points awarded successfully to the winner!',
     data: result,
   });
 });

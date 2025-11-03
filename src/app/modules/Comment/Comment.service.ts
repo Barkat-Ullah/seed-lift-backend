@@ -146,7 +146,7 @@ const getCommentsByChallenge = async (
     page = 1,
     limit = 10,
     sortBy = 'createdAt',
-    sortOrder = 'desc',
+    sortOrder = 'asc',
   } = query;
 
   const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -273,10 +273,14 @@ const getCommentersByChallenge = async (challengeId: string) => {
           level: true,
           coin: true,
           comment: {
+            where:{
+              challengeId
+            },
             select: {
               id: true,
               content: true,
               isWin: true,
+              challengeId:true
             },
             orderBy: { createdAt: 'asc' },
             take: 1,
@@ -298,7 +302,7 @@ const getCommentersByChallenge = async (challengeId: string) => {
       Awarded: challenge.isAwarded,
       seedPoints: challenge.seedPoints,
       founder: challenge.founder,
-      status:challenge.status
+      status: challenge.status,
     },
     commenters: uniqueCommenters,
   };

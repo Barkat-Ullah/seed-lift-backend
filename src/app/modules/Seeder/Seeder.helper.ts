@@ -1,16 +1,17 @@
-
 export const LEVEL_CONFIG = {
-  Starter: { minCoins: 0, maxCoins: 5000, priority: 4 },
-  Intermediate: { minCoins: 5000, maxCoins: 10000, priority: 3 },
-  Gold: { minCoins: 10000, maxCoins: 35000, priority: 2 },
-  Pro: { minCoins: 35000, maxCoins: Infinity, priority: 1 },
+  Sprout: { minCoins: 0, maxCoins: 4999, priority: 4 }, 
+  Grower: { minCoins: 5000, maxCoins: 9999, priority: 3 },
+  Cultivator: { minCoins: 10000, maxCoins: 19999, priority: 2 },
+  Harvester: { minCoins: 20000, maxCoins: 29999, priority: 1 }, 
+  Master: { minCoins: 30000, maxCoins: Infinity, priority: 0 }, 
 };
 
 export const getLevelByCoins = (coins: number) => {
-  if (coins >= 35000) return 'Pro';
-  if (coins >= 10000) return 'Gold';
-  if (coins >= 5000) return 'Intermediate';
-  return 'Starter';
+  if (coins >= 30000) return 'Master';
+  if (coins >= 20000) return 'Harvester';
+  if (coins >= 10000) return 'Cultivator';
+  if (coins >= 5000) return 'Grower';
+  return 'Sprout';
 };
 
 export const hasActiveSubscription = (seeder: any) => {
@@ -24,19 +25,23 @@ export const calculateLevelProgress = (currentLevel: string, coins: number) => {
   let progressPercentage = 0;
   let coinsToNextLevel = 0;
 
-  if (currentLevel === 'Starter') {
-    nextLevel = 'Intermediate';
-    coinsToNextLevel = 5000 - coins;
+  if (currentLevel === 'Sprout') {
+    nextLevel = 'Grower';
+    coinsToNextLevel = 5000 - coins; 
     progressPercentage = (coins / 5000) * 100;
-  } else if (currentLevel === 'Intermediate') {
-    nextLevel = 'Gold';
+  } else if (currentLevel === 'Grower') {
+    nextLevel = 'Cultivator';
     coinsToNextLevel = 10000 - coins;
-    progressPercentage = ((coins - 5000) / 5000) * 100;
-  } else if (currentLevel === 'Gold') {
-    nextLevel = 'Pro';
-    coinsToNextLevel = 35000 - coins;
-    progressPercentage = ((coins - 10000) / 25000) * 100;
-  } else if (currentLevel === 'Pro') {
+    progressPercentage = ((coins - 5000) / 5000) * 100; 
+  } else if (currentLevel === 'Cultivator') {
+    nextLevel = 'Harvester';
+    coinsToNextLevel = 20000 - coins; 
+    progressPercentage = ((coins - 10000) / 10000) * 100; 
+  } else if (currentLevel === 'Harvester') {
+    nextLevel = 'Master';
+    coinsToNextLevel = 30000 - coins; 
+    progressPercentage = ((coins - 20000) / 10000) * 100; 
+  } else if (currentLevel === 'Master') {
     nextLevel = null;
     progressPercentage = 100;
     coinsToNextLevel = 0;

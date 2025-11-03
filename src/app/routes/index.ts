@@ -8,6 +8,7 @@ import { ChallengeRoutes } from '../modules/Challenge/Challenge.routes';
 import { CommentRoutes } from '../modules/Comment/Comment.routes';
 import { ReactRoutes } from '../modules/React/React.routes';
 import { MetaRoutes } from '../modules/Meta/Meta.routes';
+import { BannerRoutes } from '../modules/banner/banner.routes';
 
 const router = express.Router();
 
@@ -47,6 +48,10 @@ const moduleRoutes = [
   {
     path: '/meta',
     route: MetaRoutes,
+  },
+  {
+    path: '/banner',
+    route: BannerRoutes,
   },
 ];
 

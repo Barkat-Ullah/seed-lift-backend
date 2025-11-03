@@ -1,5 +1,5 @@
 import httpStatus from 'http-status';
-import { User, UserRoleEnum, UserStatus } from '@prisma/client';
+import { LevelEnum, User, UserRoleEnum, UserStatus } from '@prisma/client';
 import QueryBuilder from '../../builder/QueryBuilder';
 import { prisma } from '../../utils/prisma';
 import AppError from '../../errors/AppError';
@@ -11,6 +11,8 @@ interface UserWithOptionalPassword extends Omit<User, 'password'> {
 }
 
 const getAllUsersFromDB = async (query: any) => {
+
+
   const usersQuery = new QueryBuilder<typeof prisma.user>(prisma.user, query);
   usersQuery.where({
     role: {
@@ -99,7 +101,7 @@ const getMyProfileFromDB = async (id: string) => {
         phoneNumber: true,
         description: true,
         skill: true,
-        isVerified: true,
+        isPro: true,
         level: true,
         coin: true,
         subscriptionStart: true,
@@ -213,7 +215,7 @@ const getUserDetailsFromDB = async (id: string) => {
         profile: true,
         phoneNumber: true,
         skill: true,
-        isVerified: true,
+        isPro: true,
         level: true,
         coin: true,
         subscriptionStart: true,
@@ -413,7 +415,7 @@ const updateMyProfile = async (
         phoneNumber: true,
         description: true,
         skill: true,
-        isVerified: true,
+        isPro: true,
         level: true,
         coin: true,
       },
