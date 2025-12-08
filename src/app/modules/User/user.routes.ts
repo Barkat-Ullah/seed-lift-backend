@@ -22,6 +22,13 @@ router.delete(
   UserControllers.hardDeleteUser,
 );
 
+// router.put(
+//   '/user-role/:id',
+//   auth(UserRoleEnum.ADMIN),
+//   validateRequest.body(userValidation.updateUserRoleSchema),
+//   UserControllers.updateUserRoleStatus,
+// );
+
 router.put(
   '/user-status/:id',
   auth(UserRoleEnum.ADMIN),

@@ -3,6 +3,7 @@ import admin from './firebaseAdmin';
 import AppError from '../../errors/AppError';
 import { prisma } from '../../utils/prisma';
 import { Request } from 'express';
+import { UserRoleEnum } from '@prisma/client';
 type SendNotificationParams = {
   userId: string;
   senderId: string;
@@ -209,34 +210,34 @@ const sendToAdmins = async (req: any, title: string, body: string) => {
 
 const adminNotify = async (req: Request) => {
   const userId = req.user.id;
-const notifications = await prisma.notification.findMany({
-  where: { receiverId: userId },
-  select: {
-    id: true,
-    receiverId: true,
-    senderId: true,
-    title: true,
-    body: true,
-    sender: {
-      select: {
-        email: true,
-        // coach: {
-        //   select: {
-        //     fullName: true,
-        //     profile: true,
-        //   },
-        // },
+  const notifications = await prisma.notification.findMany({
+    where: { receiverId: userId },
+    select: {
+      id: true,
+      receiverId: true,
+      senderId: true,
+      title: true,
+      body: true,
+      sender: {
+        select: {
+          email: true,
+          // coach: {
+          //   select: {
+          //     fullName: true,
+          //     profile: true,
+          //   },
+          // },
+        },
       },
     },
-  },
-  orderBy: { createdAt: 'desc' },
-});
+    orderBy: { createdAt: 'desc' },
+  });
 
-// const result = await prisma.coach.findUnique({
-//   where: {
-//     id: senderId,
-//   },
-// });
+  // const result = await prisma.coach.findUnique({
+  //   where: {
+  //     id: senderId,
+  //   },
+  // });
 
   return notifications;
 };
@@ -342,14 +343,90 @@ const getSingleNotificationFromDB = async (
       body: updatedNotification.body,
       isRead: updatedNotification.isRead,
       createdAt: updatedNotification.createdAt,
-      sender: {
-        id: updatedNotification?.sender?.id,
-        email: updatedNotification?.sender?.email,
-      },
+      // sender: {
+      //   id: updatedNotification?.sender?.id,
+      //   email: updatedNotification?.sender?.email,
+      // },
     };
   } catch (error: any) {
     throw new AppError(500, error.message || 'Failed to fetch notification');
   }
+};
+
+const getMyNotifications = async (userEmail: string) => {
+  // Find user
+  const user = await prisma.user.findUnique({
+    where: { email: userEmail },
+    select: {
+      id: true,
+      role: true,
+      founder: {
+        select: {
+          id: true,
+        },
+      },
+      seeder: {
+        select: {
+          id: true,
+        },
+      },
+    },
+  });
+
+  if (!user) {
+    throw new AppError(httpStatus.NOT_FOUND, 'User not found');
+  }
+
+  // ✅ Declare whereConditions outside
+  let whereConditions: any = {};
+
+  if (user.role === UserRoleEnum.FOUNDER) {
+    whereConditions = {
+      receiverId: user?.founder?.id,
+    };
+  } else if (user.role === UserRoleEnum.SEEDER) {
+    whereConditions = {
+      receiverId: user?.seeder?.id,
+    };
+  }
+
+  const notifications = await prisma.notification.findMany({
+    where: whereConditions,
+    orderBy: {
+      createdAt: 'desc',
+    },
+    select: {
+      id: true,
+      title: true,
+      body: true,
+      isRead: true,
+      createdAt: true,
+      sender: {
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          founder: {
+            select: {
+              fullName: true,
+              profile: true,
+            },
+          },
+          seeder: {
+            select: {
+              fullName: true,
+              profile: true,
+            },
+          },
+        },
+      },
+    },
+  });
+  // console.log({ notifications });
+
+  return {
+    notifications,
+  };
 };
 
 export const notificationServices = {
@@ -359,4 +436,5 @@ export const notificationServices = {
   getSingleNotificationFromDB,
   sendToAdmins,
   adminNotify,
+  getMyNotifications,
 };

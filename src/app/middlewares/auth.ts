@@ -35,7 +35,7 @@ const auth = <T extends readonly (UserRoleEnum | 'ANY')[]>(
       );
 
       // Check user is exist
-      const user = await insecurePrisma.user.findUniqueOrThrow({
+      const user = await insecurePrisma.user.findUnique({
         where: {
           id: verifyUserToken.id,
         },

@@ -10,9 +10,9 @@ import {
   serverHealth,
   setupMiddlewares,
 } from './shared';
-
-import { rootHandler } from './shared/rootHandler';
 import { StripeWebHook } from './app/utils/StripeUtils';
+import { geminiRouter } from './app/modules/ai/ai.routes';
+import { fileUploader } from './app/utils/uploadCloudinary';
 
 const app: Application = express();
 
@@ -26,12 +26,13 @@ app.post(
 setupMiddlewares(app);
 
 app.use('/api/v1', apiLimiter, router);
+app.use('/api/v1', geminiRouter);
 
 // Upload route (after main routes, before error handler)
 app.post(
   '/api/v1/upload-image',
-  auth('ANY'),
-  upload.single('image'),
+  // auth('ANY'),
+  fileUploader.uploadSingle,
   imageUpload,
 );
 

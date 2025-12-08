@@ -19,20 +19,29 @@ model Founder {
     user User @relation(fields: [email], references: [email])
 
     challenge Challenge[]
-    payment Payment[]
-    comment Comment[]
+    payment   Payment[]
+    comment   Comment[]
 
-    createdAt DateTime    @default(now())
-    updatedAt DateTime    @updatedAt
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
 
     @@map("founder")
 }
 
 enum OrgTypeEnum {
-    Startup
-    Established
-    NGO
+    Marketing_and_Growth
+    Design_and_Creative
+    Development_and_Tech
+    Business_Strategy_and_Operation
+    Finance_and_Investment
+    Human_Resource_and_Culture
+    Legal_and_Compliance
+    Customer_Support_and_Communication
+    Project_Management_and_Operations
+    Creative_Writing_and_Content
+    Learning_and_Education
+    Innovation_and_Future
+    General_and_Soft
+    AI
+    Others
 }
-
-
-

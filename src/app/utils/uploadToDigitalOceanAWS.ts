@@ -98,3 +98,5 @@ export const deleteMultipleFromDigitalOceanAWS = async (
 ): Promise<void> => {
   await Promise.all(urls.map(url => deleteFromDigitalOceanAWS(url)));
 };
+
+

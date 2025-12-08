@@ -22,14 +22,18 @@ const loginWithOtpFromDB = async (
   res: Response,
   payload: { email: string; password: string },
 ) => {
-  const userData = await insecurePrisma.user.findUniqueOrThrow({
+  const userData = await insecurePrisma.user.findUnique({
     where: { email: payload.email },
     include: {
-      admin: { select: { fullName: true } },
-      founder: { select: { fullName: true } },
-      seeder: { select: { fullName: true } },
+      admin: { select: { fullName: true, id: true } },
+      founder: { select: { fullName: true, id: true } },
+      seeder: { select: { fullName: true, id: true } },
     },
   });
+
+  if (!userData) {
+    throw new AppError(401, 'User not found');
+  }
 
   const fullName =
     userData.admin?.fullName ||
@@ -78,6 +82,7 @@ const loginWithOtpFromDB = async (
       name: fullName,
       email: userData.email,
       role: userData.role,
+      // subscriptionId:userData.,
       accessToken,
     };
   }
@@ -85,6 +90,7 @@ const loginWithOtpFromDB = async (
 
 // ======================== REGISTER WITH OTP ========================
 const registerWithOtpIntoDB = async (payload: any) => {
+  console.log({ payload });
   if (!payload?.email || !payload?.password) {
     throw new AppError(httpStatus.BAD_REQUEST, 'Missing required fields');
   }
@@ -98,11 +104,17 @@ const registerWithOtpIntoDB = async (payload: any) => {
   const hashedPassword = await bcrypt.hash(payload.password, 12);
   const otp = generateOTP().toString();
 
-  const skills = (payload.skill as string[])
-    .map(s => s.trim())
-    .filter((s): s is SkillCategory =>
-      Object.values(SkillCategory).includes(s as SkillCategory),
-    );
+  // 🔥 FIX: define skills outside the block
+  let skills: SkillCategory[] | undefined;
+
+  if (payload.role === UserRoleEnum.SEEDER) {
+    skills = (payload.skill as string[])
+      .map(s => s.trim())
+      .filter((s): s is SkillCategory =>
+        Object.values(SkillCategory).includes(s as SkillCategory),
+      );
+  }
+
   try {
     await prisma.$transaction(async tx => {
       const newUser = await tx.user.create({
@@ -131,8 +143,8 @@ const registerWithOtpIntoDB = async (payload: any) => {
             fullName: payload.fullName,
             email: payload.email,
             phoneNumber: payload.phoneNumber ?? undefined,
-            description: payload.description ?? undefined,
-            businessName: payload.businessName ?? undefined,
+            // description: payload.description ?? undefined,
+            // businessName: payload.businessName ?? undefined,
             orgType: payload.orgType ?? undefined,
           },
         });
@@ -158,6 +170,7 @@ const registerWithOtpIntoDB = async (payload: any) => {
   };
 };
 
+
 // ======================== COMMON OTP VERIFY (REGISTER + FORGOT) ========================
 const verifyOtpCommon = async (payload: { email: string; otp: string }) => {
   const user = await prisma.user.findUnique({
@@ -169,9 +182,9 @@ const verifyOtpCommon = async (payload: { email: string; otp: string }) => {
       otpExpiry: true,
       isEmailVerified: true,
       role: true,
-      admin: { select: { fullName: true } },
-      founder: { select: { fullName: true } },
-      seeder: { select: { fullName: true } },
+      admin: { select: { fullName: true, id: true } },
+      founder: { select: { fullName: true, id: true } },
+      seeder: { select: { fullName: true, id: true } },
     },
   });
 
@@ -234,7 +247,11 @@ const verifyOtpCommon = async (payload: { email: string; otp: string }) => {
 
 // ======================== RESEND OTP ========================
 const resendVerificationWithOtp = async (email: string) => {
-  const user = await insecurePrisma.user.findFirstOrThrow({ where: { email } });
+  const user = await insecurePrisma.user.findFirst({ where: { email } });
+
+  if (!user) {
+    throw new AppError(401, 'User not found');
+  }
 
   if (user.status === UserStatus.RESTRICTED) {
     throw new AppError(httpStatus.FORBIDDEN, 'User is Suspended');
@@ -268,9 +285,13 @@ const resendVerificationWithOtp = async (email: string) => {
 
 // ======================== CHANGE PASSWORD ========================
 const changePassword = async (user: any, payload: any) => {
-  const userData = await insecurePrisma.user.findUniqueOrThrow({
+  const userData = await insecurePrisma.user.findUnique({
     where: { email: user.email, status: UserStatus.ACTIVE },
   });
+
+  if (!userData) {
+    throw new AppError(401, 'User not found');
+  }
 
   const isCorrectPassword = await bcrypt.compare(
     payload.oldPassword,
@@ -291,10 +312,14 @@ const changePassword = async (user: any, payload: any) => {
 
 // ======================== FORGOT PASSWORD ========================
 const forgetPassword = async (email: string) => {
-  const userData = await prisma.user.findUniqueOrThrow({
+  const userData = await prisma.user.findUnique({
     where: { email },
     select: { email: true, status: true, id: true, otpExpiry: true, otp: true },
   });
+
+  if (!userData) {
+    throw new AppError(401, 'User not found');
+  }
 
   if (userData.status === UserStatus.RESTRICTED) {
     throw new AppError(httpStatus.BAD_REQUEST, 'User has been suspended');

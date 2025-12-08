@@ -53,6 +53,7 @@ const getAllSeeder = async (query: Record<string, any>, userMail: string) => {
       id: true,
       fullName: true,
       profile: true,
+      description: true,
       level: true,
       coin: true,
       email: true,
@@ -63,7 +64,7 @@ const getAllSeeder = async (query: Record<string, any>, userMail: string) => {
     },
   });
 
-  // ✅ Add totalWin for each seeder
+  //  Add totalWin for each seeder
   const seedersWithWin = await Promise.all(
     seeders.map(async seeder => {
       const totalWin = await prisma.comment.count({
@@ -74,11 +75,21 @@ const getAllSeeder = async (query: Record<string, any>, userMail: string) => {
         },
       });
 
-      return { ...seeder, totalWin };
+      const totalParticipation = await prisma.comment.groupBy({
+        by: ['challengeId'],
+        where: {
+          seederId: seeder.id,
+        },
+        _count: {
+          challengeId: true,
+        },
+      });
+
+      return { ...seeder, totalWin, totalSolution: totalParticipation.length };
     }),
   );
 
-  // ✅ Add ranking metadata
+  //  Add ranking metadata
   const seedersWithRanking = seedersWithWin.map(seeder => {
     const hasSubscription = hasActiveSubscription(seeder);
     const levelPriority =
@@ -92,7 +103,7 @@ const getAllSeeder = async (query: Record<string, any>, userMail: string) => {
     };
   });
 
-  // ✅ Sort seeders
+  //  Sort seeders
   seedersWithRanking.sort((a, b) => {
     if (a.sortKey !== b.sortKey) return a.sortKey - b.sortKey;
     if (a.levelPriority !== b.levelPriority)
@@ -100,7 +111,7 @@ const getAllSeeder = async (query: Record<string, any>, userMail: string) => {
     return (b.coin || 0) - (a.coin || 0);
   });
 
-  // ✅ Add rank
+  //  Add rank
   const rankedSeeders = seedersWithRanking.map((seeder, index) => ({
     ...seeder,
     rank: index + 1,
@@ -110,7 +121,7 @@ const getAllSeeder = async (query: Record<string, any>, userMail: string) => {
   const skip = (Number(page) - 1) * Number(limit);
   const paginatedSeeders = rankedSeeders.slice(skip, skip + Number(limit));
 
-  // ✅ Current seeder with progress
+  //  Current seeder with progress
   let currentSeederWithProgress = null;
   if (currentSeeder) {
     const levelProgress = calculateLevelProgress(
@@ -139,7 +150,6 @@ const getAllSeeder = async (query: Record<string, any>, userMail: string) => {
   };
 };
 
-
 // Get Single Seeder by ID
 // ============================================
 const getSeederByIdFromDB = async (id: string) => {
@@ -147,6 +157,7 @@ const getSeederByIdFromDB = async (id: string) => {
     where: {
       id: id,
     },
+
     select: {
       id: true,
       fullName: true,
@@ -229,11 +240,9 @@ const getSeederByIdFromDB = async (id: string) => {
         isFounderReply: true,
       },
     });
-   
   } catch (error) {
     console.error('Error fetching founder reply count:', error);
     founderReplyCount = 0;
-   
   }
 
   return {
@@ -385,6 +394,15 @@ const getMySeederChallenges = async (seederMail: string) => {
           comment: true,
         },
       },
+      react: {
+        where: {
+          seederId: seeder.id,
+        },
+        take: 1,
+        select: {
+          isReact: true,
+        },
+      },
       founder: {
         select: {
           id: true,
@@ -421,12 +439,28 @@ const getMySeederChallenges = async (seederMail: string) => {
               id: true,
               fullName: true,
               email: true,
+              profile: true,
+              user: {
+                select: {
+                  role: true,
+                },
+              },
             },
           },
           _count: {
             select: {
               react: true,
               comment: true,
+            },
+          },
+          react: {
+            // 🆕 This is required for the type to include 'react' property
+            where: {
+              seederId: seeder.id,
+            },
+            take: 1,
+            select: {
+              isReact: true,
             },
           },
         },
@@ -438,11 +472,13 @@ const getMySeederChallenges = async (seederMail: string) => {
   const invited = challenge.map(ch => ({
     ...ch,
     type: 'invited',
+    isReact: ch.react?.[0]?.isReact ?? false, // 🆕 Safe access with optional chaining
   }));
 
   const commented = myCommentedChallenges.map(c => ({
     ...c.challenge,
     type: 'commented',
+    isReact: c?.challenge?.react?.[0]?.isReact ?? false, // 🆕 Now 'react' exists in the type
   }));
 
   // ⚙️ Step 2: merge intelligently (commented will override invited)
@@ -469,6 +505,16 @@ const myRewards = async (seederMail: string) => {
   const seeder = await prisma.seeder.findUnique({
     where: {
       email: seederMail,
+    },
+    select: {
+      id: true,
+      fullName: true,
+      profile: true,
+      user: {
+        select: {
+          role: true,
+        },
+      },
     },
   });
 
@@ -502,6 +548,27 @@ const myRewards = async (seederMail: string) => {
               comment: true,
             },
           },
+          react: {
+            where: {
+              seederId: seeder.id,
+            },
+            take: 1,
+            select: {
+              isReact: true,
+            },
+          },
+          founder: {
+            select: {
+              id: true,
+              fullName: true,
+              profile: true,
+              user: {
+                select: {
+                  role: true,
+                },
+              },
+            },
+          },
         },
       },
     },
@@ -510,18 +577,30 @@ const myRewards = async (seederMail: string) => {
     },
   });
 
-  const challenge = await prisma.challenge.count();
-  const activeChallenge = await prisma.challenge.count({
-    where: { isActive: true },
-  });
+  const processedRewards = rewardCommentsWithSeeder.map(comment => ({
+    id: comment.id,
+    challenge: {
+      ...comment.challenge,
+      isReact: comment?.challenge?.react[0]?.isReact ?? false,
+    },
+  }));
 
+  const awardeeChallenge = await prisma.comment.count({
+    where: {
+      seederId: seeder.id,
+      isWin: true,
+      challenge: { isAwarded: true },
+    },
+  });
+  const newChallenge = await prisma.challenge.count({
+    where: { isActive: true, isAwarded: false },
+  });
   return {
-    totalChallenge: challenge,
-    activeChallenge: activeChallenge,
-    rewards: rewardCommentsWithSeeder,
+    awardeeChallenge,
+    newChallenge,
+    rewards: processedRewards,
   };
 };
-
 // Update Seeder Level
 // ============================================
 const updateSeederLevel = async (seederId: string) => {

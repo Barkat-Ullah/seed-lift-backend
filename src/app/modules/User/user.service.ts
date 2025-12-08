@@ -1,18 +1,27 @@
 import httpStatus from 'http-status';
-import { LevelEnum, User, UserRoleEnum, UserStatus } from '@prisma/client';
+import {
+  LevelEnum,
+  OrgTypeEnum,
+  User,
+  UserRoleEnum,
+  UserStatus,
+} from '@prisma/client';
 import QueryBuilder from '../../builder/QueryBuilder';
 import { prisma } from '../../utils/prisma';
 import AppError from '../../errors/AppError';
 import { uploadToDigitalOceanAWS } from '../../utils/uploadToDigitalOceanAWS';
-import { getLevelByCoins } from '../Seeder/Seeder.helper';
+import {
+  getLevelByCoins,
+  hasActiveSubscription,
+  LEVEL_CONFIG,
+} from '../Seeder/Seeder.helper';
+import { fileUploader } from '../../utils/uploadCloudinary';
 
 interface UserWithOptionalPassword extends Omit<User, 'password'> {
   password?: string;
 }
 
 const getAllUsersFromDB = async (query: any) => {
-
-
   const usersQuery = new QueryBuilder<typeof prisma.user>(prisma.user, query);
   usersQuery.where({
     role: {
@@ -57,6 +66,12 @@ const getAllUsersFromDB = async (query: any) => {
     })
     .execute();
 
+  // await prisma.founder.updateMany({
+  //   data: {
+  //     orgType: OrgTypeEnum.AI,
+  //   },
+  // });
+
   return {
     ...result,
     data: result.data,
@@ -64,7 +79,7 @@ const getAllUsersFromDB = async (query: any) => {
 };
 
 const getMyProfileFromDB = async (id: string) => {
-  const user = await prisma.user.findUniqueOrThrow({
+  const user = await prisma.user.findUnique({
     where: {
       id,
       status: UserStatus.ACTIVE,
@@ -76,6 +91,10 @@ const getMyProfileFromDB = async (id: string) => {
       status: true,
     },
   });
+
+  if (!user) {
+    throw new AppError(401, 'User not found');
+  }
 
   let profileInfo = null;
 
@@ -192,7 +211,7 @@ const getUserDetailsFromDB = async (id: string) => {
     throw new AppError(httpStatus.NOT_FOUND, 'User not found');
   }
 
-  let profileInfo = null;
+  let profileInfo: any = null;
   if (user.role === UserRoleEnum.ADMIN) {
     profileInfo = await prisma.admin.findUnique({
       where: { email: user.email },
@@ -236,17 +255,70 @@ const getUserDetailsFromDB = async (id: string) => {
       },
     });
     if (profileInfo) {
-      const founderReplyCount = await prisma.comment.count({
-        where: {
-          parent: {
-            seederId: profileInfo.id,
-          },
-          isFounderReply: true,
+      console.log({ profileInfo });
+      const hasSubscription = hasActiveSubscription(profileInfo);
+      // const coins = seeder.coin || 0;
+      const currentLevel = profileInfo?.level;
+      const levelInfo = LEVEL_CONFIG[currentLevel as keyof typeof LEVEL_CONFIG];
+
+      const allSeeders = await prisma.seeder.findMany({
+        select: {
+          id: true,
+          level: true,
+          coin: true,
+          subscriptionStart: true,
+          subscriptionEnd: true,
         },
       });
+
+      const rankedSeeders = allSeeders
+        .map(s => ({
+          ...s,
+          hasSubscription: hasActiveSubscription(s),
+          levelPriority:
+            LEVEL_CONFIG[s.level as keyof typeof LEVEL_CONFIG]?.priority || 5,
+        }))
+        .sort((a, b) => {
+          if (a.hasSubscription !== b.hasSubscription) {
+            return a.hasSubscription ? -1 : 1;
+          }
+          if (a.levelPriority !== b.levelPriority) {
+            return a.levelPriority - b.levelPriority;
+          }
+          return (b.coin || 0) - (a.coin || 0);
+        });
+      // console.log({rankedSeeders})
+
+      const rank = rankedSeeders.findIndex(s => s.id === profileInfo.id) + 1;
+
+      let founderReplyCount = 0;
+      try {
+        founderReplyCount = await prisma.comment.count({
+          where: {
+            parent: {
+              seederId: profileInfo.id,
+            },
+            isFounderReply: true,
+          },
+        });
+      } catch (error) {
+        console.error('Error fetching founder reply count:', error);
+        founderReplyCount = 0;
+      }
       profileInfo = {
         ...profileInfo,
-        founderReplyCount,
+        hasSubscription,
+        levelInfo,
+        currentRank: rank,
+        totalWins: profileInfo.comment?.length || 0,
+        totalReplies: founderReplyCount,
+        successRate:
+          profileInfo._count.comment > 0
+            ? Math.round(
+                (profileInfo?.comment?.length / profileInfo?._count?.comment) *
+                  100,
+              )
+            : 0,
       };
     }
   } else if (user.role === UserRoleEnum.FOUNDER) {
@@ -326,6 +398,18 @@ const updateUserStatus = async (userId: string, adminId: string) => {
   return result;
 };
 
+// const updateUserRoleStatusIntoDB = async (id: string, role: UserRoleEnum) => {
+//   const result = await prisma.user.update({
+//     where: {
+//       id: id,
+//     },
+//     data: {
+//       role: role,
+//     },
+//   });
+//   return result;
+// };
+
 const softDeleteUserIntoDB = async (id: string) => {
   const result = await prisma.user.update({
     where: { id },
@@ -363,9 +447,14 @@ const updateMyProfile = async (
 
   let profileUrl: string | null = null;
 
+  // if (profileFile) {
+  //   const uploaded = await uploadToDigitalOceanAWS(profileFile);
+  //   profileUrl = uploaded.Location;
+  // }
+
   if (profileFile) {
-    const uploaded = await uploadToDigitalOceanAWS(profileFile);
-    profileUrl = uploaded.Location;
+    const result = await fileUploader.uploadToCloudinary(profileFile);
+    profileUrl = result.Location;
   }
 
   const updateData: any = { ...payload };

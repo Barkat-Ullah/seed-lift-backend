@@ -4,9 +4,10 @@ import { prisma } from '../../utils/prisma';
 import { uploadToDigitalOceanAWS } from '../../utils/uploadToDigitalOceanAWS';
 import AppError from '../../errors/AppError';
 import httpStatus from 'http-status';
+import { createNotification } from '../../constant/notify';
 
 const createComment = async (req: Request) => {
-  const { content, challengeId } = JSON.parse(req.body.data);
+  const { content, challengeId } = req.body;
   const seederEmail = req.user.email;
 
   // Find seeder
@@ -35,17 +36,17 @@ const createComment = async (req: Request) => {
   }
 
   // Handle image upload
-  let imageUrl = null;
-  if (req.file) {
-    const location = await uploadToDigitalOceanAWS(req.file);
-    imageUrl = location.Location;
-  }
+  // let imageUrl = null;
+  // if (req.file) {
+  //   const location = await uploadToDigitalOceanAWS(req.file);
+  //   imageUrl = location.Location;
+  // }
 
   // Create comment
   const comment = await prisma.comment.create({
     data: {
       content,
-      image: imageUrl,
+      // image: imageUrl,
       seederId: seeder.id,
       challengeId,
       isFounderReply: false,
@@ -62,6 +63,13 @@ const createComment = async (req: Request) => {
         },
       },
     },
+  });
+
+  await createNotification({
+    receiverId: challenge.founderId,
+    senderId: seeder.id,
+    title: 'A New Comment Added Now',
+    body: `${seeder.fullName || 'A Seeder'} commented on your challenge: ${challenge.title }`,
   });
 
   return comment;
@@ -101,17 +109,17 @@ const replyToComment = async (commentId: string, req: Request) => {
   }
 
   // Handle image upload
-  let imageUrl = null;
-  if (req.file) {
-    const location = await uploadToDigitalOceanAWS(req.file);
-    imageUrl = location.Location;
-  }
+  // let imageUrl = null;
+  // if (req.file) {
+  //   const location = await uploadToDigitalOceanAWS(req.file);
+  //   imageUrl = location.Location;
+  // }
 
   // Create reply
   const reply = await prisma.comment.create({
     data: {
       content,
-      image: imageUrl,
+      // image: imageUrl,
       founderId: founder.id,
       challengeId: parentComment.challengeId,
       parentId: commentId,
@@ -175,7 +183,7 @@ const getCommentsByChallenge = async (
       select: {
         id: true,
         content: true,
-        image: true,
+        // image: true,
         seederId: true,
         founderId: true,
         challengeId: true,
@@ -196,7 +204,7 @@ const getCommentsByChallenge = async (
           select: {
             id: true,
             content: true,
-            image: true,
+            // image: true,
             seederId: true,
             founderId: true,
             challengeId: true,
@@ -273,14 +281,14 @@ const getCommentersByChallenge = async (challengeId: string) => {
           level: true,
           coin: true,
           comment: {
-            where:{
-              challengeId
+            where: {
+              challengeId,
             },
             select: {
               id: true,
               content: true,
               isWin: true,
-              challengeId:true
+              challengeId: true,
             },
             orderBy: { createdAt: 'asc' },
             take: 1,
@@ -378,7 +386,7 @@ const updateComment = async (id: string, data: Partial<any>, user: any) => {
   // Update comment
   const updateData: any = {};
   if (data.content) updateData.content = data.content;
-  if (data.image) updateData.image = data.image;
+  // if (data.image) updateData.image = data.image;
 
   const updatedComment = await prisma.comment.update({
     where: { id },

@@ -24,6 +24,11 @@ router.get(
   auth(UserRoleEnum.ADMIN),
   notificationController.getAllNotificationsForAdmin,
 );
+router.get(
+  '/my',
+  auth(UserRoleEnum.FOUNDER, UserRoleEnum.SEEDER),
+  notificationController.getMyNotification,
+);
 
 router.get('/', auth(), notificationController.getNotifications);
 router.get(

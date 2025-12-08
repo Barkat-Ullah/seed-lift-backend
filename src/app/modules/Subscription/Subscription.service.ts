@@ -312,7 +312,33 @@ const getSubscriptionByIdFromDB = async (id: string) => {
 
 // Update Subscription
 const updateIntoDb = async (id: string, data: Partial<any>) => {
-  // normalize price
+  const subscription = await prisma.subscription.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      title: true,
+      price: true,
+      duration: true,
+      stripePriceId: true,
+      stripeProductId: true,
+    },
+  });
+
+  if (!subscription) {
+    throw new AppError(httpStatus.NOT_FOUND, 'Subscription not found');
+  }
+
+  // Must have stripe product id
+  if (!subscription.stripeProductId) {
+    throw new AppError(
+      httpStatus.INTERNAL_SERVER_ERROR,
+      'Missing Stripe Product ID. Cannot update paid subscription.',
+    );
+  }
+
+  const stripeProductId = subscription.stripeProductId;
+
+  // Normalize price
   const price =
     data.price !== undefined && data.price !== null
       ? typeof data.price === 'string'
@@ -320,28 +346,71 @@ const updateIntoDb = async (id: string, data: Partial<any>) => {
         : Number(data.price)
       : undefined;
 
-  // normalize feature using toStringArray
-  const featureArray =
-    data.feature !== undefined ? toStringArray(data.feature) : undefined;
+  const updateData: any = {};
 
-  const updateData: any = {
-    ...(data.title && { title: data.title }),
-    ...(price !== undefined && !Number.isNaN(price) && { price }),
-    ...(data.duration && { duration: data.duration }),
-  };
+  // -----------------------------
+  // 1️⃣ UPDATE STRIPE PRODUCT
+  // -----------------------------
+  const needToUpdateProduct = data.title || data.duration || data.description;
 
-  // For arrays in Prisma (Mongo), use set for replace
-  if (featureArray !== undefined) {
+  if (needToUpdateProduct) {
+    await stripe.products.update(stripeProductId, {
+      name: data.title || subscription.title,
+      description: `${data.duration || subscription.duration} subscription plan`,
+    });
+
+    if (data.title) updateData.title = data.title;
+    if (data.duration) updateData.duration = data.duration;
+  }
+
+  // -----------------------------
+  // 2️⃣ UPDATE STRIPE PRICE
+  // If price changed → create new Stripe Price
+  // -----------------------------
+  let stripePriceId = subscription.stripePriceId;
+
+  if (price !== undefined && price !== subscription.price) {
+    // 2.1 → Old price inactive
+    if (subscription.stripePriceId) {
+      await stripe.prices.update(subscription.stripePriceId, {
+        active: false,
+      });
+    }
+
+    // 2.2 → Create new price
+    const newPrice = await stripe.prices.create({
+      unit_amount: Math.round(price * 100),
+      currency: 'usd',
+      recurring: {
+        interval: subscription.duration === 'YEARLY' ? 'year' : 'month',
+      },
+      product: stripeProductId,
+    });
+
+    stripePriceId = newPrice.id;
+    updateData.stripePriceId = newPrice.id;
+    updateData.price = price;
+  }
+
+  // -----------------------------
+  // 3️⃣ UPDATE MONGO FEATURES
+  // -----------------------------
+  if (data.feature !== undefined) {
+    const featureArray = toStringArray(data.feature);
     updateData.feature = featureArray;
   }
 
-  const subscription = await prisma.subscription.update({
+  // -----------------------------
+  // 4️⃣ FINAL DATABASE UPDATE
+  // -----------------------------
+  const result = await prisma.subscription.update({
     where: { id },
     data: updateData,
   });
 
-  return subscription;
+  return result;
 };
+
 
 //
 const deleteIntoDb = async (id: string) => {

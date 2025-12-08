@@ -25,6 +25,21 @@ const getAllChallenge = catchAsync(async (req: Request, res: Response) => {
     data: result.data,
   });
 });
+const getAllChallengeForAdmin = catchAsync(
+  async (req: Request, res: Response) => {
+
+    const result = await ChallengeServices.getAllAdminChallenge(
+      req.query,
+    );
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: 'Successfully retrieved all Challenges by admin',
+      meta: result.meta,
+      data: result.data,
+    });
+  },
+);
 
 const getMyChallenge = catchAsync(async (req: Request, res: Response) => {
   const result = await ChallengeServices.getMyChallenge(
@@ -114,4 +129,5 @@ export const ChallengeController = {
   softDeleteIntoDb,
   awardedPoints,
   updateUserStatus,
+  getAllChallengeForAdmin,
 };

@@ -9,6 +9,9 @@ import { CommentRoutes } from '../modules/Comment/Comment.routes';
 import { ReactRoutes } from '../modules/React/React.routes';
 import { MetaRoutes } from '../modules/Meta/Meta.routes';
 import { BannerRoutes } from '../modules/banner/banner.routes';
+import { FaqRoutes } from '../modules/about/Faq.routes';
+import { SecurityRouter } from '../modules/Security/Security.routes';
+import { notificationsRoute } from '../modules/Notifications/Notification.routes';
 
 const router = express.Router();
 
@@ -52,6 +55,18 @@ const moduleRoutes = [
   {
     path: '/banner',
     route: BannerRoutes,
+  },
+  {
+    path: '/about',
+    route: FaqRoutes,
+  },
+  {
+    path: '/security',
+    route: SecurityRouter,
+  },
+  {
+    path: '/notify',
+    route: notificationsRoute,
   },
 ];
 

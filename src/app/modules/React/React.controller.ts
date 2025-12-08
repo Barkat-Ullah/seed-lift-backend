@@ -11,9 +11,7 @@ const createReact = catchAsync(async (req: Request, res: Response) => {
   sendResponse(res, {
     statusCode: httpStatus.CREATED,
     success: true,
-    message: result.isFavorite
-      ? 'Added to favorites'
-      : 'Removed from favorites',
+    message: `React ${result.isReact}`,
     data: result,
   });
 });

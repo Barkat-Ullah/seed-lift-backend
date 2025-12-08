@@ -5,15 +5,19 @@ import {
   ChallengeStatus,
   ChallengeCategory,
   ChallengeType,
+  UserRoleEnum,
+  UserStatus,
 } from '@prisma/client';
 import AppError from '../../errors/AppError';
 import httpStatus from 'http-status';
 import { hasActiveSubscription } from '../Seeder/Seeder.helper';
 import { updateChallengesWithRemainingDays } from './Challenge.constrant';
+import { fileUploader } from '../../utils/uploadCloudinary';
+import { createBulkNotifications } from '../../constant/notify';
 
 const createIntoDb = async (req: Request) => {
   const {
-    inviteTalents,
+    // inviteTalents,
     status,
     deadline,
     seedPoints,
@@ -40,15 +44,16 @@ const createIntoDb = async (req: Request) => {
   // Handle attachment upload
   let attachmentUrl = null;
   if (req.file) {
-    const location = await uploadToDigitalOceanAWS(req.file);
+    // const location = await uploadToDigitalOceanAWS(req.file);
+    const location = await fileUploader.uploadToCloudinary(req.file);
     attachmentUrl = location.Location;
   }
 
   // Parse inviteTalents and tags if they're strings
-  const parsedInviteTalents =
-    typeof inviteTalents === 'string'
-      ? JSON.parse(inviteTalents)
-      : inviteTalents || [];
+  // const parsedInviteTalents =
+  //   typeof inviteTalents === 'string'
+  //     ? JSON.parse(inviteTalents)
+  //     : inviteTalents || [];
 
   const parsedTags = typeof tags === 'string' ? JSON.parse(tags) : tags || [];
 
@@ -64,10 +69,77 @@ const createIntoDb = async (req: Request) => {
       seedPoints: parseInt(seedPoints),
       deadline: new Date(deadline),
       status: (status as ChallengeStatus) || ChallengeStatus.PENDING,
-      inviteTalents: parsedInviteTalents,
+      // inviteTalents: parsedInviteTalents ,
       founderId: founder.id,
     },
   });
+  //*notify
+  if (challengeType === ChallengeType.Public) {
+    const seeders = await prisma.seeder.findMany({
+      where: {
+        user: {
+          isDeleted: false,
+          status: UserStatus.ACTIVE,
+        },
+      },
+      include: {
+        user: {
+          include: {
+            founder: {
+              select: {
+                id: true,
+              },
+            },
+            seeder: {
+              select: {
+                id: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    //* notifications
+    const notifications = seeders.map(seeder => ({
+      receiverId: seeder.id,
+      senderId: founder.id,
+      title: 'New Challenge Available',
+      body: `${founder.fullName} posted a new challenge: ${title}`,
+    }));
+
+    if (notifications.length > 0) {
+      await createBulkNotifications(notifications);
+    }
+  } else if (
+    challengeType === ChallengeType.Private 
+  ) {
+    if (category) {
+      const matchSkillSeeders = await prisma.seeder.findMany({
+        where: {
+          skill: {
+            has: category,
+          },
+          user: {
+            isDeleted: false,
+            status: UserStatus.ACTIVE,
+          },
+        },
+      });
+
+      const notifications = matchSkillSeeders.map(seeder => ({
+        receiverId: seeder.id,
+        senderId: founder.id,
+        title: 'You Are Invited to a Challenge',
+        body: `${founder.fullName} invited you to: ${title}`,
+      }));
+
+      if (notifications.length > 0) {
+        await createBulkNotifications(notifications);
+      }
+    }
+  }
+
   return challenge;
 };
 
@@ -161,12 +233,27 @@ const getAllChallenge = async (
           comment: true,
         },
       },
+      react: {
+        where: {
+          seederId: seeder?.id,
+        },
+        take: 1,
+        select: {
+          isReact: true,
+        },
+      },
       founder: {
         select: {
           id: true,
           email: true,
           fullName: true,
+          profile: true,
           subscriptionId: true,
+          user: {
+            select: {
+              role: true,
+            },
+          },
         },
       },
       createdAt: true,
@@ -180,7 +267,12 @@ const getAllChallenge = async (
     now,
   );
 
-  let filteredChallenges = updatedAllChallenges.filter(challenge => {
+  const processedChallenges = updatedAllChallenges.map(challenge => ({
+    ...challenge,
+    isReact: challenge.react[0]?.isReact ?? false,
+  }));
+  //*include seeder
+  let filteredChallenges = processedChallenges.filter(challenge => {
     if (challenge.challengeType === 'Public') {
       return true;
     }
@@ -241,11 +333,80 @@ const getAllChallenge = async (
   };
 };
 
+const getAllAdminChallenge = async (query: Record<string, any>) => {
+  const {
+    searchTerm,
+    category,
+    challengeType,
+    tags,
+    minSeedPoints,
+    maxSeedPoints,
+    sortBy = 'createdAt',
+    sortOrder = 'desc',
+    page = 1,
+    limit = 10,
+  } = query;
+
+  const skip = (parseInt(page) - 1) * parseInt(limit);
+  const take = parseInt(limit);
+
+  const where: any = {};
+
+  if (searchTerm) {
+    where.OR = [
+      { title: { contains: searchTerm, mode: 'insensitive' } },
+      { description: { contains: searchTerm, mode: 'insensitive' } },
+    ];
+  }
+
+  if (category) where.category = category;
+
+  if (tags) {
+    const tagArray = Array.isArray(tags) ? tags : [tags];
+    where.tags = { hasSome: tagArray };
+  }
+
+  if (minSeedPoints || maxSeedPoints) {
+    where.seedPoints = {};
+    if (minSeedPoints) where.seedPoints.gte = parseInt(minSeedPoints);
+    if (maxSeedPoints) where.seedPoints.lte = parseInt(maxSeedPoints);
+  }
+
+  if (challengeType) {
+    where.challengeType = challengeType;
+  }
+
+  // ⭐ Total count (without pagination)
+  const total = await prisma.challenge.count({ where });
+
+  // ⭐ Pagination + Sorting
+  const allChallenges = await prisma.challenge.findMany({
+    where,
+    skip,
+    take,
+    orderBy: { [sortBy]: sortOrder },
+  });
+
+  return {
+    data: allChallenges,
+    meta: {
+      page: parseInt(page),
+      limit: parseInt(limit),
+      total,
+      totalPages: Math.ceil(total / parseInt(limit)),
+    },
+  };
+};
+
 const getMyChallenge = async (email: string, query: Record<string, any>) => {
   const { status } = query;
   const founder = await prisma.founder.findUnique({
     where: { email },
   });
+
+  if (!founder) {
+    throw new AppError(httpStatus.NOT_FOUND, 'Founder not found');
+  }
 
   const where: any = {
     founderId: founder?.id,
@@ -255,10 +416,6 @@ const getMyChallenge = async (email: string, query: Record<string, any>) => {
 
   if (status) {
     where.status = status;
-  }
-
-  if (!founder) {
-    throw new AppError(httpStatus.NOT_FOUND, 'Founder not found');
   }
 
   const challenges = await prisma.challenge.findMany({
@@ -287,22 +444,62 @@ const getMyChallenge = async (email: string, query: Record<string, any>) => {
           comment: true,
         },
       },
+      react: {
+        where: {
+          founderId: founder.id,
+        },
+        take: 1,
+        select: {
+          isReact: true,
+        },
+      },
       founder: {
         select: {
           id: true,
           email: true,
           fullName: true,
+          profile: true,
+          user: {
+            select: {
+              role: true,
+            },
+          },
         },
       },
     },
   });
 
-  const challenge = await prisma.challenge.count();
-  const activeChallenge = await prisma.challenge.count({
-    where: { isActive: true },
+  // Extract isReact and transform challenges
+  const transformedChallenges = challenges.map(challenge => {
+    const { react, ...rest } = challenge;
+    return {
+      ...rest,
+      isReact: react.length > 0 ? react[0].isReact : false,
+      _count: {
+        ...challenge._count,
+      },
+    };
   });
 
-  return { totalChallenge: challenge, activeChallenge, challenges };
+  const totalChallenge = await prisma.challenge.count({
+    where: {
+      founderId: founder.id,
+    },
+  });
+  const activeChallenge = await prisma.challenge.count({
+    where: {
+      isActive: true,
+      isAwarded: false,
+      isDeleted: false,
+      status: ChallengeStatus.PENDING,
+    },
+  });
+
+  return {
+    totalChallenge,
+    activeChallenge,
+    challenges: transformedChallenges,
+  };
 };
 
 const getChallengeByIdFromDB = async (id: string) => {
@@ -637,4 +834,5 @@ export const ChallengeServices = {
   softDeleteIntoDb,
   awardSeedPoints,
   updateChallengeStatus,
+  getAllAdminChallenge,
 };

@@ -8,6 +8,7 @@ import catchAsync from '../app/utils/catchAsync';
 import AppError from '../app/errors/AppError';
 import { uploadToDigitalOceanAWS } from '../app/utils/uploadToDigitalOceanAWS';
 import { prisma } from '../app/utils/prisma';
+import { fileUploader } from '../app/utils/uploadCloudinary';
 
 
 
@@ -72,18 +73,24 @@ export const notFound = (req: Request, res: Response, next: NextFunction) => {
   });
 };
 
-//only image upload
 export const imageUpload = catchAsync(async (req: Request, res: Response) => {
   if (!req.file) {
     throw new AppError(httpStatus.BAD_REQUEST, 'No image file');
   }
 
   const file = req.file;
-  const location = await uploadToDigitalOceanAWS(file);
-  const imageUrl = location.Location;
 
-  res.status(httpStatus.OK).json({ success: true, imageUrl });
+  const result = await fileUploader.uploadToCloudinary(file);
+  // console.log({result})
+
+  const imageUrl = result.Location;
+
+  res.status(httpStatus.OK).json({
+    success: true,
+    imageUrl,
+  });
 });
+
 
 export const serverHealth = catchAsync(async (req: Request, res: Response) => {
   await prisma.$connect();

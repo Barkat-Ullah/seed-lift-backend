@@ -8,8 +8,13 @@ const router = express.Router();
 
 router.get(
   '/',
-  auth(UserRoleEnum.FOUNDER, UserRoleEnum.SEEDER),
+  auth(UserRoleEnum.FOUNDER, UserRoleEnum.SEEDER,UserRoleEnum.ADMIN),
   ChallengeController.getAllChallenge,
+);
+router.get(
+  '/admin',
+  // auth(UserRoleEnum.ADMIN),
+  ChallengeController.getAllChallengeForAdmin,
 );
 router.get(
   '/my',

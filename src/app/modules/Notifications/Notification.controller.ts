@@ -47,6 +47,18 @@ const getAllNotificationsForAdmin = catchAsync(async (req, res) => {
   });
 });
 
+const getMyNotification = catchAsync(async (req, res) => {
+  const userMail = req.user.email;
+  const result = await notificationServices.getMyNotifications(userMail);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: 200,
+    message: 'Notifications fetched successfully',
+    data: result.notifications,
+  });
+});
+
 const getNotifications = catchAsync(async (req: any, res: any) => {
   const notifications = await notificationServices.getNotificationsFromDB(req);
 
@@ -80,4 +92,5 @@ export const notificationController = {
   getSingleNotificationById,
   sendToAdmins,
   getAllNotificationsForAdmin,
+  getMyNotification,
 };

@@ -60,6 +60,18 @@ const softDeleteUser = catchAsync(async (req, res) => {
   });
 });
 
+// const updateUserRoleStatus = catchAsync(async (req, res) => {
+//   const { id } = req.params;
+//   const role = req.body.role;
+//   const result = await UserServices.updateUserRoleStatusIntoDB(id, role);
+
+//   sendResponse(res, {
+//     statusCode: httpStatus.OK,
+//     message: 'User role updated successfully',
+//     data: result,
+//   });
+// });
+
 const hardDeleteUser = catchAsync(async (req, res) => {
   const userId = req.user.id;
   const { id } = req.params;

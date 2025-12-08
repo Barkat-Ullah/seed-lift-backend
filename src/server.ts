@@ -16,7 +16,7 @@ async function main() {
     // Seed data (await to ensure completion before listen)
     // console.log('🌱 Seeding super admin data...');
     await seedSuperAdmin();
- 
+
     console.log(`🚀 Starting server on port ${port}...`);
     server.listen(port, () => {
       console.log(`✅ Server is running on port ${port}`);

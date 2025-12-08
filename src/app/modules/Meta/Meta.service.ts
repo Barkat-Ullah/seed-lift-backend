@@ -68,7 +68,15 @@ const getAdminMeta = async (adminMail: string, period: string = 'monthly') => {
       id: true,
       fullName: true,
       email: true,
+      profile: true,
+      user: {
+        select: {
+          id: true,
+          role: true,
+        },
+      },
     },
+
     orderBy: {
       challenge: {
         _count: 'desc',
@@ -86,9 +94,16 @@ const getAdminMeta = async (adminMail: string, period: string = 'monthly') => {
           createdAt: { gte: periodStart, lte: periodEnd },
         },
       });
+      const totalCount = await prisma.challenge.count({
+        where: {
+          founderId: founder.id,
+          createdAt: { gte: periodStart, lte: periodEnd },
+        },
+      });
       return {
         ...founder,
-        announceReward: awardedCount, 
+        totalChallenge: totalCount,
+        announceReward: awardedCount,
       };
     }),
   );
@@ -107,6 +122,13 @@ const getAdminMeta = async (adminMail: string, period: string = 'monthly') => {
       id: true,
       fullName: true,
       email: true,
+      profile: true,
+      user: {
+        select: {
+          id: true,
+          role: true,
+        },
+      },
     },
     orderBy: {
       comment: {
@@ -115,7 +137,6 @@ const getAdminMeta = async (adminMail: string, period: string = 'monthly') => {
     },
     take: 2,
   });
-
 
   const topSeedersWithCounts = await Promise.all(
     topSeeders.map(async seeder => {
@@ -126,20 +147,32 @@ const getAdminMeta = async (adminMail: string, period: string = 'monthly') => {
           createdAt: { gte: periodStart, lte: periodEnd },
         },
       });
+      const totalCount = await prisma.comment.count({
+        where: {
+          seederId: seeder.id,
+          isWin: true,
+          createdAt: { gte: periodStart, lte: periodEnd },
+        },
+      });
       return {
         ...seeder,
-        winningCount: winCount, 
+        totalComment: totalCount,
+        winningCount: winCount,
       };
     }),
   );
+
+  const topUser = [...topFoundersWithCounts, ...topSeedersWithCounts];
+  // console.log({ topUser });
 
   return {
     totalRevenue,
     totalFounders,
     totalSeeders,
     totalChallenges,
-    topFounders: topFoundersWithCounts,
-    topSeeders: topSeedersWithCounts,
+    topUser,
+    // topFounders: topFoundersWithCounts,
+    // topSeeders: topSeedersWithCounts,
   };
 };
 

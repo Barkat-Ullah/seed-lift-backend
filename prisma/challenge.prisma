@@ -36,6 +36,8 @@ model React {
   seederId    String @db.ObjectId
   challengeId String @db.ObjectId
 
+  isReact Boolean @default(false)
+
   challenge Challenge @relation(fields: [challengeId], references: [id])
 
   createdAt DateTime @default(now())
@@ -96,3 +98,188 @@ enum ChallengeCategory {
     AI
     Others
 }
+
+
+
+
+
+// ============================================================================
+// UPDATED PRISMA SCHEMA
+// ============================================================================
+
+/*
+model React {
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  founderId   String? @db.ObjectId  // ✅ Made optional
+  seederId    String? @db.ObjectId  // ✅ Made optional
+  challengeId String  @db.ObjectId
+  userType    UserType              // ✅ Added to track who reacted
+
+  isReact Boolean @default(false)
+
+  challenge Challenge @relation(fields: [challengeId], references: [id])
+  founder   Founder?  @relation(fields: [founderId], references: [id])
+  seeder    Seeder?   @relation(fields: [seederId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // ✅ Updated unique constraint to handle both cases
+  @@unique([founderId, challengeId], name: "founder_challenge_react")
+  @@unique([seederId, challengeId], name: "seeder_challenge_react")
+  @@map("love_react")
+}
+
+enum UserType {
+  FOUNDER
+  SEEDER
+}
+*/
+
+// ============================================================================
+// SERVICE: CREATE/TOGGLE REACT (HANDLES BOTH FOUNDER AND SEEDER)
+// ============================================================================
+
+// const createReactIntoDb = async (
+//   userEmail: string,
+//   challengeId: string,
+//   userType: 'FOUNDER' | 'SEEDER'
+// ) => {
+//   // Find user based on type
+//   let user;
+//   let userId;
+//   let founderId = null;
+//   let seederId = null;
+
+//   if (userType === 'SEEDER') {
+//     user = await prisma.seeder.findUnique({
+//       where: { email: userEmail },
+//     });
+//     if (!user) {
+//       throw new AppError(httpStatus.NOT_FOUND, 'Seeder not found');
+//     }
+//     seederId = user.id;
+//   } else if (userType === 'FOUNDER') {
+//     user = await prisma.founder.findUnique({
+//       where: { email: userEmail },
+//     });
+//     if (!user) {
+//       throw new AppError(httpStatus.NOT_FOUND, 'Founder not found');
+//     }
+//     founderId = user.id;
+//   }
+
+//   // Verify challenge exists
+//   const challenge = await prisma.challenge.findUnique({
+//     where: { id: challengeId },
+//   });
+
+//   if (!challenge) {
+//     throw new AppError(httpStatus.NOT_FOUND, 'Challenge not found');
+//   }
+
+//   // Check existing react based on user type
+//   const whereCondition =
+//     userType === 'SEEDER'
+//       ? { seederId_challengeId: { seederId: seederId!, challengeId } }
+//       : { founderId_challengeId: { founderId: founderId!, challengeId } };
+
+//   const existingReact = await prisma.react.findUnique({
+//     where: whereCondition,
+//   });
+
+//   if (existingReact) {
+//     // Toggle existing react
+//     const newIsReact = !existingReact.isReact;
+//     const result = await prisma.react.update({
+//       where: { id: existingReact.id },
+//       data: {
+//         isReact: newIsReact,
+//       },
+//       select: {
+//         id: true,
+//         isReact: true,
+//         userType: true,
+//         createdAt: true,
+//       },
+//     });
+//     return result;
+//   }
+
+//   // Create new react
+//   const result = await prisma.react.create({
+//     data: {
+//       founderId,
+//       seederId,
+//       challengeId,
+//       isReact: true,
+//       userType,
+//     },
+//     select: {
+//       id: true,
+//       isReact: true,
+//       userType: true,
+//       createdAt: true,
+//     },
+//   });
+
+//   return result;
+// };
+
+// // ============================================================================
+// // CONTROLLER: SEEDER REACT
+// // ============================================================================
+
+// const seederReactChallenge = catchAsync(async (req: Request, res: Response) => {
+//   const userEmail = req.user.email;
+//   const { challengeId } = req.body;
+
+//   const result = await createReactIntoDb(userEmail, challengeId, 'SEEDER');
+
+//   sendResponse(res, {
+//     statusCode: httpStatus.OK,
+//     success: true,
+//     message: result.isReact
+//       ? 'Challenge reacted successfully'
+//       : 'Challenge unreacted successfully',
+//     data: result,
+//   });
+// });
+
+// // ============================================================================
+// // CONTROLLER: FOUNDER REACT
+// // ============================================================================
+
+// const founderReactChallenge = catchAsync(async (req: Request, res: Response) => {
+//   const userEmail = req.user.email;
+//   const { challengeId } = req.body;
+
+//   const result = await createReactIntoDb(userEmail, challengeId, 'FOUNDER');
+
+//   sendResponse(res, {
+//     statusCode: httpStatus.OK,
+//     success: true,
+//     message: result.isReact
+//       ? 'Challenge reacted successfully'
+//       : 'Challenge unreacted successfully',
+//     data: result,
+//   });
+// });
+
+// // ============================================================================
+// // ROUTES
+// // ============================================================================
+
+// // Seeder routes
+// router.post(
+//   '/seeder/react',
+//   auth('SEEDER'),
+//   SeederController.seederReactChallenge
+// );
+
+// // Founder routes
+// router.post(
+//   '/founder/react',
+//   auth('FOUNDER'),
+//   FounderController.founderReactChallenge
+// );

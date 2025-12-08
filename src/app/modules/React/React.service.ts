@@ -2,16 +2,7 @@ import AppError from '../../errors/AppError';
 import { prisma } from '../../utils/prisma';
 import httpStatus from 'http-status';
 
-type ToggleResult = {
-  isFavorite: boolean;
-  react?: any;
-};
-
-const createReactIntoDb = async (
-  seederMail: string,
-  challengeId: string,
-): Promise<ToggleResult> => {
-
+const createReactIntoDb = async (seederMail: string, challengeId: string) => {
   const seeder = await prisma.seeder.findUnique({
     where: { email: seederMail },
   });
@@ -31,7 +22,6 @@ const createReactIntoDb = async (
   const founderId = challenge.founderId;
   const seederId = seeder.id;
 
-
   const existingReact = await prisma.react.findUnique({
     where: {
       founderId_seederId_challengeId: {
@@ -43,23 +33,34 @@ const createReactIntoDb = async (
   });
 
   if (existingReact) {
-   
-    const deleted = await prisma.react.delete({
+    const newIsReact = !existingReact.isReact;
+    const result = await prisma.react.update({
       where: { id: existingReact.id },
+      data: {
+        isReact: newIsReact,
+      },
+      select: {
+        id: true,
+        isReact: true,
+      },
     });
-    return { isFavorite: false, react: deleted };
+    return result;
   }
 
- 
-  const created = await prisma.react.create({
+  const result = await prisma.react.create({
     data: {
       founderId,
       seederId,
       challengeId,
+      isReact: true,
+    },
+    select: {
+      id: true,
+      isReact: true,
     },
   });
 
-  return { isFavorite: true, react: created };
+  return result;
 };
 
 const getAllReactIntoDb = async (challengeId: string) => {
